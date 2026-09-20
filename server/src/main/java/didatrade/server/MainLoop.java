@@ -8,7 +8,7 @@ import didatrade.DidaTradePaxosServiceGrpc;
 
 import didatrade.util.GenericResponseCollector;
 import didatrade.util.CollectorStreamObserver;
-import didatrade.util.PhaseOneBogusProcessor;
+import didatrade.util.PhaseOneProcessor;
 import didatrade.util.PhaseTwoResponseProcessor;
 
 import didatrade.configs.ConfigurationScheduler;
@@ -36,16 +36,16 @@ public class MainLoop implements Runnable  {
     }
 
     public void run() {
-	while (true) {
-	    this.next_log_entry++;
-	    this.processEntry(this.next_log_entry);
-	}
-    }
-      
-    public synchronized void wakeup() {
-	this.has_work = true;
-	notify();    
-    }
+		while (true) {
+			this.next_log_entry++;
+			this.processEntry(this.next_log_entry);
+		}
+		}
+		
+		public synchronized void wakeup() {
+		this.has_work = true;
+		notify();
+		}
    
  
     public synchronized void processEntry(int entry_number) {
@@ -85,7 +85,7 @@ public class MainLoop implements Runnable  {
 
 		
 		// PhaseOneResponseProcessor phase_one_processor = new PhaseOneResponseProcessor(this.server_state.scheduler, low_ballot, high_ballot);
-		PhaseOneBogusProcessor phase_one_processor = new PhaseOneBogusProcessor(this.server_state.scheduler, low_ballot, high_ballot);
+		PhaseOneProcessor phase_one_processor = new PhaseOneProcessor(this.server_state.scheduler, low_ballot, high_ballot);
 		
 		ArrayList<DidaTradePaxos.PhaseOneReply> phase_one_responses = new ArrayList<DidaTradePaxos.PhaseOneReply>();
 		GenericResponseCollector<DidaTradePaxos.PhaseOneReply>  phase_one_collector = new GenericResponseCollector<DidaTradePaxos.PhaseOneReply>(phase_one_responses, n_acceptors, phase_one_processor);
@@ -95,7 +95,7 @@ public class MainLoop implements Runnable  {
 		    this.server_state.async_stubs[acceptors.get(i)].phaseone(phase_one_request, phase_one_observer);
 		}
 		
-		
+		// TODO: it should NOT wait for every acceptor, why? because they could be down. We need (probabily) to use waitUntilQuorum() 
 		phase_one_collector.waitUntilDone();
 		if (phase_one_processor.getAccepted() == false) {
 		    ballot_aborted = true;
@@ -130,12 +130,12 @@ public class MainLoop implements Runnable  {
 			    CollectorStreamObserver<DidaTradePaxos.PhaseTwoReply> phase_two_observer = new CollectorStreamObserver<DidaTradePaxos.PhaseTwoReply>(phase_two_collector);
 			    this.server_state.async_stubs[acceptors.get(i)].phasetwo(phase_two_request.build(), phase_two_observer);
 			}
-			
+
 			System.out.println("Waiting for responses...");
 			phase_two_collector.waitUntilDone();
 			if (phase_two_processor.getAccepted() == false) {
 			    ballot_aborted = true;
-			    this.server_state.setCurrentBallot (phase_two_processor.getMaxballot());
+			    this.server_state.setCurrentBallot(phase_two_processor.getMaxballot());
 			}
 			System.out.println("Paxos phase 2 ended with ballot_aborted = " + ballot_aborted);
 		    }

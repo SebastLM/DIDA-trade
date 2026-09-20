@@ -31,12 +31,12 @@ public class PaxosLog {
 
     
     public synchronized PaxosInstance testAndSetEntry(int position, int ballot) {
-	PaxosInstance entry = this.log.get(position);
+        PaxosInstance entry = this.log.get(position);
 
-	if (entry == null){
-	    entry = new PaxosInstance(position, ballot);
-	    this.log.put (position, entry);
-	}
-	return entry;
+        if (entry == null){
+            entry = new PaxosInstance(position, ballot);
+            this.log.put (position, entry);
+        }
+        return entry;
     }
 }

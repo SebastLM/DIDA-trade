@@ -26,44 +26,44 @@ public class GenericResponseCollector<T>  {
     }
 
     public synchronized void addResponse(T resp) {
-	if (!this.done) {
-	    collected_responses.add(resp);
-	    if (this.processor != null)
-		this.done = this.processor.onNext (this.collected_responses, resp);
-	}
-	this.received++;
-	this.pending--;
-	if (this.pending==0)
-	    this.done = true;
-	notifyAll();
+		if (!this.done) {
+			collected_responses.add(resp);
+			if (this.processor != null)
+				this.done = this.processor.onNext(this.collected_responses, resp);
+		}
+		this.received++;
+		this.pending--;
+		if (this.pending==0)
+			this.done = true;
+		notifyAll();
     }
 
     public synchronized void addNoResponse() {
-	this.pending--;
-	if (this.pending==0)
-	    this.done = true;
-	notifyAll();
+		this.pending--;
+		if (this.pending==0) {
+			this.done = true;
+		}
+
+		notifyAll();
     }
- 
+
     public synchronized void waitForQuorum(int quorum) {
         while ((this.done == false) && (this.received < quorum)) {
             try {
-		wait ();
-	    }
-	    catch (InterruptedException e) {
-	    }
-	}
-	this.done = true;
+				wait();
+			}
+			catch (InterruptedException e) {}
+		}
+		this.done = true;
     }
 
     
     public synchronized void waitUntilDone() {
         while (this.done == false) {
             try {
-		wait ();
-	    }
-	    catch (InterruptedException e) {
-	    }
-	}
+				wait();
+			}
+			catch (InterruptedException e) {}
+		}
     }
 }
