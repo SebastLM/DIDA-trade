@@ -35,8 +35,8 @@ public class DidaTradeServer {
 	int my_id      = Integer.valueOf(args[1]);
 	char scheduler = args[2].charAt(0);
 	
-	server_state = new DidaTradeServerState(base_port, my_id, scheduler);
-	
+	DebugModeHandler debug = new DebugModeHandler();
+	server_state = new DidaTradeServerState(base_port, my_id, scheduler, debug);
 	port = base_port + my_id;
 
 	final BindableService service_impl = new DidaTradeMainServiceImpl(server_state);

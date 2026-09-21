@@ -37,8 +37,10 @@ public class DidaTradeServerState {
  
     MainLoop                    main_loop;
     Thread                      main_loop_worker;
+
+	DebugModeHandler 			debug;
     
-    public DidaTradeServerState(int port, int myself, char schedule) {
+    public DidaTradeServerState(int port, int myself, char schedule, DebugModeHandler debug) {
 	this.trade_manager    = new TradeManager();
 	this.scheduler        = new ConfigurationScheduler (schedule);
 	this.base_port        = port;
@@ -50,6 +52,7 @@ public class DidaTradeServerState {
 	this.req_history      = new RequestHistory();
 	this.paxos_log        = new PaxosLog();
 	this.main_loop        = new MainLoop(this);
+	this.debug = debug;
 
 	// populate manager
 	this.trade_manager.populate(DEFAULT_POPULATION);
@@ -154,5 +157,14 @@ public class DidaTradeServerState {
     public synchronized void setDebugMode (int mode) {
 	this.debug_mode = mode;
     }
+
+	public DebugModeHandler getDebugHandler() {
+		return this.debug;
+	}
+
+	// decoupling purposes
+	public void doDebug() {
+		this.debug.doDebugMode(this.debug_mode);
+	}
 
 }

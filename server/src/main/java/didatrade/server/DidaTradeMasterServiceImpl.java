@@ -73,12 +73,13 @@ public class DidaTradeMasterServiceImpl extends DidaTradeMasterServiceGrpc.DidaT
 		System.out.println(request);
 
 		boolean response_value = true;
-
+		
 		int request_id   = request.getReqid();
 		this.server_state.setDebugMode(request.getMode());
+		this.server_state.doDebug();
 		// for debug purposes
 		System.out.println("Setting debug mode to = " + this.server_state.getDebugMode());
-
+		// while this isn't the final implementation more work is needed. Decoupling the debug from the server state isn't the final expected
 		DidaTradeMaster.SetDebugReply.Builder response_builder = DidaTradeMaster.SetDebugReply.newBuilder();
 		response_builder.setReqid(request_id);
 		response_builder.setAck(response_value);
