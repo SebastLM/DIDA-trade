@@ -19,7 +19,7 @@ public class PhaseOneProcessor extends GenericResponseProcessor<DidaTradePaxos.P
     private int                      response;
    
     
-    public PhaseOneProcessor (ConfigurationScheduler s, int l, int h) {
+    public PhaseOneProcessor (ConfigurationScheduler s, int l, int h, int q) {
 	// System.out.println("Phase 1 processor constructor with low_ballot =" + l + " high_ballot = " + h);
     this.accepted    = true;
 	this.value       = -1;
@@ -28,6 +28,7 @@ public class PhaseOneProcessor extends GenericResponseProcessor<DidaTradePaxos.P
 	this.low_ballot  = l;
 	this.high_ballot = h;
 	this.scheduler   = s;
+    this.quorum = q;
     }
 
     public boolean getAccepted() {
@@ -46,7 +47,6 @@ public class PhaseOneProcessor extends GenericResponseProcessor<DidaTradePaxos.P
 	    return this.maxballot;
     }
     
-
     /*
     message PhaseOneReply {
         int32 instance        = 1;
@@ -64,18 +64,19 @@ public class PhaseOneProcessor extends GenericResponseProcessor<DidaTradePaxos.P
         if (last_response.getAccepted() == false) {
 			this.accepted = false;
 			this.maxballot = last_response.getMaxballot();
-
 			return true;
-            
-		} else if (this.responses > this.scheduler.quorum()) {
-            // we reach a quorum majority
-            // this.valballot = last_response.getValballot()
-            return true;
+		}
+
+        if (last_response.getValballot() > this.valballot) {
+            this.valballot = last_response.getValballot() ;
+            this.value = last_response.getValue();
         }
 
+        if (this.responses > this.q) {
+            return true;
+        }
+    
         return false;
-
-        //this.value     = last_response.getValue();
     }
 
 /* 

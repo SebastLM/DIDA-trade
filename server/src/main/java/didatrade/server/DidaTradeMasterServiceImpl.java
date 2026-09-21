@@ -69,23 +69,22 @@ public class DidaTradeMasterServiceImpl extends DidaTradeMasterServiceGrpc.DidaT
 
     @Override
     public void setdebug(DidaTradeMaster.SetDebugRequest request, StreamObserver<DidaTradeMaster.SetDebugReply> responseObserver) {
-	// for debug purposes
-	System.out.println(request);
+		// for debug purposes
+		System.out.println(request);
 
-	boolean response_value = true;
+		boolean response_value = true;
 
-	int request_id   = request.getReqid();
-	this.server_state.setDebugMode (request.getMode());
+		int request_id   = request.getReqid();
+		this.server_state.setDebugMode(request.getMode());
+		// for debug purposes
+		System.out.println("Setting debug mode to = " + this.server_state.getDebugMode());
 
-	// for debug purposes
-	System.out.println("Setting debug mode to = " + this.server_state.getDebugMode());
+		DidaTradeMaster.SetDebugReply.Builder response_builder = DidaTradeMaster.SetDebugReply.newBuilder();
+		response_builder.setReqid(request_id);
+		response_builder.setAck(response_value);
 
-	DidaTradeMaster.SetDebugReply.Builder response_builder = DidaTradeMaster.SetDebugReply.newBuilder();
-	response_builder.setReqid(request_id);
-	response_builder.setAck(response_value);
-	
-	DidaTradeMaster.SetDebugReply response = response_builder.build();
-	responseObserver.onNext(response);
-	responseObserver.onCompleted();
+		DidaTradeMaster.SetDebugReply response = response_builder.build();
+		responseObserver.onNext(response);
+		responseObserver.onCompleted();
     }
 }

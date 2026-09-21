@@ -58,7 +58,7 @@ public class MainLoop implements Runnable  {
 	    int           completed_ballot = this.server_state.getCompletedBallot ();
 
 	    List<Integer> acceptors        = this.server_state.scheduler.acceptors (ballot);
-	    int           quorum           = this.server_state.scheduler.quorum (ballot);
+	    int           quorum           = this.server_state.scheduler.quorum(ballot);
 	    int           n_acceptors      = acceptors.size();
 	    
 	    if ((ballot > -1) && (request_record != null) && (this.server_state.scheduler.leader(ballot)==this.server_state.my_id)) {
@@ -85,7 +85,7 @@ public class MainLoop implements Runnable  {
 
 		
 		// PhaseOneResponseProcessor phase_one_processor = new PhaseOneResponseProcessor(this.server_state.scheduler, low_ballot, high_ballot);
-		PhaseOneProcessor phase_one_processor = new PhaseOneProcessor(this.server_state.scheduler, low_ballot, high_ballot);
+		PhaseOneProcessor phase_one_processor = new PhaseOneProcessor(this.server_state.scheduler, low_ballot, high_ballot, quorum);
 		
 		ArrayList<DidaTradePaxos.PhaseOneReply> phase_one_responses = new ArrayList<DidaTradePaxos.PhaseOneReply>();
 		GenericResponseCollector<DidaTradePaxos.PhaseOneReply>  phase_one_collector = new GenericResponseCollector<DidaTradePaxos.PhaseOneReply>(phase_one_responses, n_acceptors, phase_one_processor);
