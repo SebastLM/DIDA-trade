@@ -17,6 +17,18 @@ public class Console {
     private int ballot_completed = -1;
     private int last_ballot      = -1;
 
+	private static int getDebugMode(String mode) {
+        switch (mode.toLowerCase()) {
+            case "crash":         return 1;
+            case "freeze":        return 2;
+            case "unfreeze":
+            case "un-freeze":     return 3;
+            case "slow-mode-on":  return 4;
+            case "slow-mode-off": return 5;
+            default:              return -1;
+        }
+    }
+
     public synchronized void setBallotCompleted (int ballot) {
 	if (ballot > this.ballot_completed)
 	    this.ballot_completed = ballot;
@@ -204,7 +216,10 @@ public class Console {
 		    System.out.println("debug " + parameter1 + " " + parameter2);
                     if ((parameter1 != null) && (parameter2 != null)) {
 			try {
-			    mode  =  Integer.parseInt(parameter1);
+			    mode = getDebugMode(parameter1);
+				if (mode == -1) {
+					mode = Integer.parseInt(parameter1);
+				}
 			    replica =  Integer.parseInt(parameter2);
 			    System.out.println("setting debug with mode " + mode + " on replica " + replica);
 
