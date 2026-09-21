@@ -16,7 +16,8 @@ public class PhaseOneProcessor extends GenericResponseProcessor<DidaTradePaxos.P
     private int                      maxballot;
     private int                      low_ballot;
     private int                      high_ballot;
-    private int                      response;
+    private int                      responses;
+    private int                      quorum;
    
     
     public PhaseOneProcessor (ConfigurationScheduler s, int l, int h, int q) {
@@ -29,6 +30,7 @@ public class PhaseOneProcessor extends GenericResponseProcessor<DidaTradePaxos.P
 	this.high_ballot = h;
 	this.scheduler   = s;
     this.quorum = q;
+    this.responses = 0;
     }
 
     public boolean getAccepted() {
@@ -72,26 +74,10 @@ public class PhaseOneProcessor extends GenericResponseProcessor<DidaTradePaxos.P
             this.value = last_response.getValue();
         }
 
-        if (this.responses > this.q) {
+        if (this.responses > this.quorum) {
             return true;
         }
     
         return false;
     }
-
-/* 
-    public synchronized boolean onNext(ArrayList<DidaTradePaxos.PhaseOneReply> all_responses, DidaTradePaxos.PhaseOneReply last_response){
-		this.responses++;
-		if (last_response.getAccepted() == false) {
-			this.accepted = false;
-			if (last_response.getMaxballot() > this.maxballot)
-			this.maxballot = last_response.getMaxballot();
-			return true;
-		}
-		else if (responses >= quorum)
-			return true;
-		else
-			return false;
-    }
-*/
 }
