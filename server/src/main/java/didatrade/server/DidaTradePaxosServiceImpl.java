@@ -35,13 +35,13 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 
 		if (ballot >= this.server_state.getCurrentBallot()) {              
 			accepted = true;
-			entry.read_ballot = ballot;
+			this.server_state.setCurrentBallot(ballot);
 		}
 
 		int maxballot = this.server_state.getCurrentBallot();
 
 		// System.out.println("Instance = " + instance + " ballot = " + ballot + " current_ballot = " + this.server_state.getCurrentBallot() + " val = " + value + " valballot = " + valballot + " maxballot = " + maxballot + " accepted = " + accepted);
-		
+
 		DidaTradePaxos.PhaseOneReply.Builder response_builder = DidaTradePaxos.PhaseOneReply.newBuilder();
 		response_builder.setInstance(instance);
 		response_builder.setServerid(this.server_state.my_id);
