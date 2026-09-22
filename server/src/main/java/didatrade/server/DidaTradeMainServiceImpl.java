@@ -17,7 +17,7 @@ public class DidaTradeMainServiceImpl extends DidaTradeMainServiceGrpc.DidaTrade
     @Override
     public void populate(DidaTradeMain.PopulateRequest request, StreamObserver<DidaTradeMain.PopulateReply> responseObserver) {
 	// for debug purposes
-	this.server_state.getDebugHandler().awaitUnfrozen();
+	this.server_state.getDebugHandler().verifyDebug();
 	System.out.println("Receiving populate request:" + request);
 
 	int reqid    = request.getReqid();
@@ -47,7 +47,7 @@ public class DidaTradeMainServiceImpl extends DidaTradeMainServiceGrpc.DidaTrade
     @Override
     public void adduser(DidaTradeMain.AddUserRequest request, StreamObserver<DidaTradeMain.AddUserReply> responseObserver) {
 	// for debug purposes
-	this.server_state.getDebugHandler().awaitUnfrozen();
+	this.server_state.getDebugHandler().verifyDebug();
 	System.out.println("Receiving add request:" + request);
 
 	int reqid    = request.getReqid();
@@ -79,7 +79,7 @@ public class DidaTradeMainServiceImpl extends DidaTradeMainServiceGrpc.DidaTrade
     
     public void buy(DidaTradeMain.BuyRequest request, StreamObserver<DidaTradeMain.BuyReply> responseObserver) {
 	// for debug purposes
-	this.server_state.getDebugHandler().awaitUnfrozen();
+	this.server_state.getDebugHandler().verifyDebug();
 	System.out.println("Receiving buy request:" + request);
 
 	int reqid    = request.getReqid();
@@ -111,7 +111,7 @@ public class DidaTradeMainServiceImpl extends DidaTradeMainServiceGrpc.DidaTrade
     @Override
     public void sell(DidaTradeMain.SellRequest request, StreamObserver<DidaTradeMain.SellReply> responseObserver) {
 	// for debug purposes
-	this.server_state.getDebugHandler().awaitUnfrozen();
+	this.server_state.getDebugHandler().verifyDebug();
 	System.out.println("Receiving sell request:" + request);
 
 	int reqid    = request.getReqid();
@@ -143,7 +143,7 @@ public class DidaTradeMainServiceImpl extends DidaTradeMainServiceGrpc.DidaTrade
     @Override
     public void balance(DidaTradeMain.BalanceRequest request, StreamObserver<DidaTradeMain.BalanceReply> responseObserver) {
 	// for debug purposes
-	this.server_state.getDebugHandler().awaitUnfrozen();
+	this.server_state.getDebugHandler().verifyDebug();
 	System.out.println("Receiving balance request:" + request);
 
 	int reqid    = request.getReqid();
@@ -175,7 +175,7 @@ public class DidaTradeMainServiceImpl extends DidaTradeMainServiceGrpc.DidaTrade
     @Override
     public void dump(DidaTradeMain.DumpRequest request, StreamObserver<DidaTradeMain.DumpReply> responseObserver) {
 	// for debug purposes
-	this.server_state.getDebugHandler().awaitUnfrozen();
+	this.server_state.getDebugHandler().verifyDebug();
 	System.out.println("Receiving dump request:" + request);
 
 	int reqid = request.getReqid();

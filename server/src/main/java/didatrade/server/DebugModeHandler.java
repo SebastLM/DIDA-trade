@@ -1,21 +1,27 @@
 package didatrade.server;
 
 import java.util.*;
-
+import java.util.concurrent.TimeUnit;
 
 
 public class DebugModeHandler {
     
+    private static final int MIN_TIMEOUT = 1;
+    private static final int MAX_TIMEOUT = 5;
+    
     private boolean frozen = false;
     private final Object freezeLock = new Object();
+    
+    Random r = new Random();
+    private int random_timeout = 0;
 
     public void doDebugMode(int mode) {
         switch (mode) {
-            case 0 -> crash();
-            case 1 -> freeze();
-            case 2 -> unFreeze();
-            case 3 -> slowMode();
-            case 4 -> slowModeOff();
+            case 1 -> crash();
+            case 2 -> freeze();
+            case 3 -> unFreeze();
+            case 4 -> slowMode();
+            case 5 -> slowModeOff();
         }
     }
 
@@ -44,6 +50,14 @@ public class DebugModeHandler {
         }
     }
 
+    public void verifyDebug() {
+        if (frozen == true) {
+            awaitUnfrozen();
+        } else if (random_timeout != 0) {
+            awaitTimeOut();
+        }
+    }
+
     public void awaitUnfrozen() {
         synchronized (freezeLock) {
             while (frozen) {
@@ -51,18 +65,27 @@ public class DebugModeHandler {
                     freezeLock.wait();
                 } catch (InterruptedException e) {
                     System.err.println("thread interrupted");
-                    return;
+                    Thread.currentThread().interrupt();
                 }
             }
         }
     }
 
     public void slowMode() {
-        // TODO
+        random_timeout = r.nextInt(MAX_TIMEOUT - MIN_TIMEOUT + 1) + MIN_TIMEOUT;
     }
 
     public void slowModeOff() {
-        // TODO
+        random_timeout = 0;
+    }
+
+    public void awaitTimeOut() {
+        try {
+            Thread.sleep(random_timeout * 1000);
+        } catch (InterruptedException e) {
+            System.err.println("thread interrupted");
+            Thread.currentThread().interrupt();
+        }
     }
 
 }
