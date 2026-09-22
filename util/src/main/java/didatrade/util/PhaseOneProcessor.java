@@ -20,7 +20,7 @@ public class PhaseOneProcessor extends GenericResponseProcessor<DidaTradePaxos.P
     private int                      quorum;
    
     
-    public PhaseOneProcessor (ConfigurationScheduler s, int l, int h, int q) {
+    public PhaseOneProcessor(ConfigurationScheduler s, int l, int h, int q) {
 	// System.out.println("Phase 1 processor constructor with low_ballot =" + l + " high_ballot = " + h);
     this.accepted    = true;
 	this.value       = -1;

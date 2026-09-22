@@ -70,13 +70,14 @@ public class DidaTradeMasterServiceImpl extends DidaTradeMasterServiceGrpc.DidaT
     @Override
     public void setdebug(DidaTradeMaster.SetDebugRequest request, StreamObserver<DidaTradeMaster.SetDebugReply> responseObserver) {
 		// for debug purposes
+    // TODO: create lock for mode in DidaTradeMaster.debug_mode
 		System.out.println(request);
 
 		boolean response_value = true;
 		
 		int request_id   = request.getReqid();
 		this.server_state.setDebugMode(request.getMode());
-		this.server_state.doDebug();
+		this.server_state.doDebug(); // can be done at the end so crash command still gets back to the command server, while still Decoupling gRPC from debug code logic
 		// for debug purposes
 		System.out.println("Setting debug mode to = " + this.server_state.getDebugMode());
 		// while this isn't the final implementation more work is needed. Decoupling the debug from the server state isn't the final expected

@@ -30,11 +30,8 @@ public class DebugModeHandler {
     }
 
     public void crash() {
-        // TODO
-        /*
-          System.exit();
-          // how does the commandService know we exited, do we implement a time out there, do we send response before exiting?
-        */
+        System.out.println("server crashed :(");
+        System.exit(0);
     }
 
     public void freeze() {
@@ -51,6 +48,7 @@ public class DebugModeHandler {
     }
 
     public void verifyDebug() {
+        // freeze has higher precedence over slow-mode
         if (frozen == true) {
             awaitUnfrozen();
         } else if (random_timeout != 0) {

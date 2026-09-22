@@ -178,27 +178,27 @@ public class DidaTradeMainServiceImpl extends DidaTradeMainServiceGrpc.DidaTrade
 	this.server_state.getDebugHandler().verifyDebug();
 	System.out.println("Receiving dump request:" + request);
 
-	int reqid = request.getReqid();
+      int reqid = request.getReqid();
 
-	// for debug purposes
-	System.out.println("reqid " + reqid);
+      // for debug purposes
+      System.out.println("reqid " + reqid);
 
-	DidaTradeCommand command = new DidaTradeCommand (DidaTradeAction.DUMP);
+      DidaTradeCommand command = new DidaTradeCommand (DidaTradeAction.DUMP);
 
-	// for debug purposes
-	System.out.println("Adding dump request with reqid " + reqid + " to pending");
+      // for debug purposes
+      System.out.println("Adding dump request with reqid " + reqid + " to pending");
 
-	RequestRecord request_record = new RequestRecord (reqid, command);
-	this.server_state.req_history.addToPending (reqid, request_record);
-	this.server_state.main_loop.wakeup ();
-	boolean result = request_record.waitForResponse();
+      RequestRecord request_record = new RequestRecord (reqid, command);
+      this.server_state.req_history.addToPending (reqid, request_record);
+      this.server_state.main_loop.wakeup ();
+      boolean result = request_record.waitForResponse();
 
-	// for debug purposes
-	System.out.println("Result is ready for dump request with reqid " + reqid);
-	
-	DidaTradeMain.DumpReply response =DidaTradeMain.DumpReply.newBuilder().setReqid(reqid).setResult(result).build();
-	
-	responseObserver.onNext(response);
-	responseObserver.onCompleted();
+      // for debug purposes
+      System.out.println("Result is ready for dump request with reqid " + reqid);
+      
+      DidaTradeMain.DumpReply response =DidaTradeMain.DumpReply.newBuilder().setReqid(reqid).setResult(result).build();
+      
+      responseObserver.onNext(response);
+      responseObserver.onCompleted();
     }
 }

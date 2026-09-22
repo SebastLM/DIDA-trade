@@ -221,7 +221,7 @@ public class Console {
 					mode = Integer.parseInt(parameter1);
 				}
 			    replica =  Integer.parseInt(parameter2);
-			    System.out.println("setting debug with mode " + mode + " on replica " + replica);
+			    System.out.println("setting debug with mode " + parameter1 + " on replica " + replica);
 
 			    sequence_number = sequence_number+1;
 			    int reqid = sequence_number*100 + client_id;
@@ -238,9 +238,13 @@ public class Console {
 				Iterator<DidaTradeMaster.SetDebugReply> setdebug_iterator = setdebug_responses.iterator();
 				DidaTradeMaster.SetDebugReply setdebug_reply = setdebug_iterator.next();
 				System.out.println("reply = " + setdebug_reply.getAck());
-			    }
-			    else
-				System.out.println("no reply received");
+			    } else {
+					if (parameter1.equals("crash")) {
+						System.out.println("Server crashed successfully");
+					} else {
+						System.out.println("no reply received");
+					}
+				}
 			} catch (NumberFormatException e) {
                            System.out.println("usage: debug mode replica");
                         }
