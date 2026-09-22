@@ -74,7 +74,7 @@ public class PhaseOneProcessor extends GenericResponseProcessor<DidaTradePaxos.P
             this.value = last_response.getValue();
         }
 
-        if (this.responses > this.quorum) {
+        if (this.responses >= this.quorum) {
             return true;
         }
     
