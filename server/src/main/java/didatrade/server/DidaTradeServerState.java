@@ -193,4 +193,8 @@ public class DidaTradeServerState {
 		this.debug.doDebugMode(this.debug_mode);
 	}
 
+	public int add_instance() {
+		return this.max_instance++;
+	}
+
 }
