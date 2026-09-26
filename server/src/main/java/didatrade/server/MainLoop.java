@@ -38,15 +38,107 @@ public class MainLoop implements Runnable  {
     public void run() {
 		while (true) {
 			this.next_log_entry++;
-			this.processEntry(this.next_log_entry);
+			int ballot = getCurrentBallot();
+			PaxosInstance next_entry = this.server_state.paxos_log.testAndSetEntry(next_log_entry);
+
+			if ((this.server_state.scheduler.leader(ballot) == this.server_state.my_id) && \
+				this.server_state.getLastPreparedBallot() < ballot) {
+					ArrayList<Int> phase_two_values = this.processPhaseOne(this.next_log_entry, ballot); 
+					if (phase_two_values == null) {
+						System.out.println("Entry not decided: waiting");
+						this.has_work = false;
+						
+						while (this.has_work == false) {
+							try {
+								wait();
+							} catch (InterruptedException e) {
+								System.out.println("Waited interrupted:" e.message());
+							}
+						}
+						continue;
+					} else {
+						for (int value: phase_two_values) {
+							this.processPhaseTwo(value, ballot,this.next_log_entry) {
+				
+							}
+						}
+
+					}
+					
+				}
+
+				for (int i = 0; )
+				this.processPhaseTwo()
+			}
+
+			if (next_entry.decided == false) {
+				System.out.println("Entry not decided: waiting");
+				this.has_work = false;
+				while (this.has_work == false) {
+					try {
+						wait();
+					} catch (InterruptedException e) {
+						System.out.println("Waited interrupted:" e.message());
+					}
+				}
 		}
 	}
-		
+
 	public synchronized void wakeup() {
 		this.has_work = true;
 		notify();
 	}
-   
+
+	Map<Integer, Integer> processPhaseOne(int entry_number, int ballot) {
+
+		int completed_ballot = this.server_state.getCompletedBallot();
+		List<Integer> acceptors        = this.server_state.scheduler.acceptors(ballot);
+		int           quorum           = this.server_state.scheduler.quorum(ballot);
+		int           n_acceptors      = acceptors.size();
+		// Paxos Phase One
+		System.out.println("Going to run paxos phase 1");
+
+		// send phase1
+		DidaTradePaxos.PhaseOneRequest.Builder phase_one_request_builder = DidaTradePaxos.PhaseOneRequest.newBuilder();
+		phase_one_request_builder.setInstance(entry_number);
+		phase_one_request_builder.setRequestballot(ballot);
+
+		DidaTradePaxos.PhaseOneRequest phase_one_request = phase_one_request_builder.build();
+		System.out.println("Going to send phase 1" + phase_one_request);
+
+		int low_ballot = Math.max(completed_ballot, 0);
+		int high_ballot = ballot;
+
+		PhaseOneProcessor phase_one_processor = new PhaseOneProcessor(this.server_state.scheduler, low_ballot, high_ballot, quorum);
+
+		ArrayList<DidaTradePaxos.PhaseOneReply> phase_one_responses = new ArrayList<DidaTradePaxos.PhaseOneReply>();
+		GenericResponseCollector<DidaTradePaxos.PhaseOneReply> phase_one_collector = new GenericResponseCollector<DidaTradePaxos.PhaseOneReply>(phase_one_responses, n_acceptors, phase_one_processor);
+
+		for (int i = 0; i < n_acceptors; i++) {
+			CollectorStreamObserver<DidaTradePaxos.PhaseOneReply> phase_one_observer  = new CollectorStreamObserver<DidaTradePaxos.PhaseOneReply>(phase_one_collector);
+			this.server_state.async_stubs[acceptors.get(i)].phaseone(phase_one_request, phase_one_observer);
+		}
+
+		phase_one_collector.waitUntilDone();
+
+		// Phase one didnt work
+		if (phase_one_processor.getAccepted() == false) {
+			ballot_aborted = true;
+			int maxballot = phase_one_processor.getMaxballot();
+			if (maxballot > this.server_state.getCurrentBallot()) {
+				this.server_state.setCurrentBallot(maxballot);
+			}
+			return null;
+		}
+
+		// Phase one worked
+		return phase_one_processor.getValues();
+	}
+
+
+	processPhaseTwo() {
+		// TODO
+	}
 
 	// synchronized
     public synchronized void processEntry(int entry_number) {
@@ -55,23 +147,22 @@ public class MainLoop implements Runnable  {
 
 		while (next_entry.decided == false) {
 			RequestRecord request_record   = this.server_state.req_history.getFirstPending();
-			int           ballot           = this.server_state.getCurrentBallot ();
-			int           completed_ballot = this.server_state.getCompletedBallot ();
+			int           ballot           = this.server_state.getCurrentBallot();
+			int           completed_ballot = this.server_state.getCompletedBallot();
 
-			List<Integer> acceptors        = this.server_state.scheduler.acceptors (ballot);
+			List<Integer> acceptors        = this.server_state.scheduler.acceptors(ballot);
 			int           quorum           = this.server_state.scheduler.quorum(ballot);
 			int           n_acceptors      = acceptors.size();
-			
+
 			if ((ballot > -1) && (request_record != null) && (this.server_state.scheduler.leader(ballot)==this.server_state.my_id)) {
-			
+
 				System.out.println("I am the leader for request with id " + request_record.getId());
 				boolean ballot_aborted   = false;
 				int phase_one_readballot = -1;
 				int phase_two_value      = request_record.getId();
-				
+
 				// Paxos Phase One
 				System.out.println("Going to run paxos phase 1");
-
 
 				// send phase1
 				DidaTradePaxos.PhaseOneRequest.Builder phase_one_request_builder = DidaTradePaxos.PhaseOneRequest.newBuilder();
@@ -81,7 +172,7 @@ public class MainLoop implements Runnable  {
 				DidaTradePaxos.PhaseOneRequest phase_one_request = phase_one_request_builder.build();
 				System.out.println("Going to send phase 1" + phase_one_request);
 				
-				int low_ballot = Math.max (completed_ballot, 0);
+				int low_ballot = Math.max(completed_ballot, 0);
 				int high_ballot = ballot;
 
 				
@@ -120,7 +211,6 @@ public class MainLoop implements Runnable  {
 					phase_two_request.setInstance(entry_number);
 					phase_two_request.setRequestballot(ballot);
 					phase_two_request.setValue(phase_two_value);
-
 
 					PhaseTwoResponseProcessor phase_two_processor = new PhaseTwoResponseProcessor(quorum);
 					
@@ -161,7 +251,7 @@ public class MainLoop implements Runnable  {
 	    }
 	    
 	}
-
+	
 
 	System.out.println("Log entry with number " + this.next_log_entry + " has been decided with command id = "+ next_entry.command_id);
 	RequestRecord request_record = this.server_state.req_history.getIfPending(next_entry.command_id);

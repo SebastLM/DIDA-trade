@@ -11,20 +11,19 @@ import didatrade.configs.ConfigurationScheduler;
 public class PhaseOneProcessor extends GenericResponseProcessor<DidaTradePaxos.PhaseOneReply>  {
     private ConfigurationScheduler   scheduler;
     private boolean                  accepted;
-    private int                      value;
-    private int                      valballot;
+    private Map<Integer, Integer>    values;
+    private Map<Integer, Integer>    valballot;
     private int                      maxballot;
     private int                      low_ballot;
     private int                      high_ballot;
     private int                      responses;
     private int                      quorum;
-   
-    
+
     public PhaseOneProcessor(ConfigurationScheduler s, int l, int h, int q) {
 	// System.out.println("Phase 1 processor constructor with low_ballot =" + l + " high_ballot = " + h);
     this.accepted    = true;
-	this.value       = -1;
-	this.valballot   = -1;
+	this.values      = new HashMap<>();
+    this.valballot   = new HashMap<>();
 	this.maxballot   = -1;
 	this.low_ballot  = l;
 	this.high_ballot = h;
@@ -36,30 +35,19 @@ public class PhaseOneProcessor extends GenericResponseProcessor<DidaTradePaxos.P
     public boolean getAccepted() {
 	    return this.accepted;
     }
-    
-    public int getValue() {
-	    return this.value;
+
+    public Map<Integer, Integer> getValues() {
+        return this.values;
     }
-    
-    public int getValballot() {
+
+    public Map<Integer, Integer> getValballot() {
 	    return this.valballot;
     }
-    
+
     public int getMaxballot() {
 	    return this.maxballot;
     }
-    
-    /*
-    message PhaseOneReply {
-        int32 instance        = 1;
-        int32 serverid        = 2;
-        int32 requestballot	= 3;
-        bool  accepted 	= 4;
-        int32 value           = 5;
-        int32 valballot       = 6;
-        int32 maxballot       = 7;
-    }
-    */
+
     public synchronized boolean onNext(ArrayList<DidaTradePaxos.PhaseOneReply> all_responses, DidaTradePaxos.PhaseOneReply last_response){
         this.responses++;
 
@@ -69,15 +57,21 @@ public class PhaseOneProcessor extends GenericResponseProcessor<DidaTradePaxos.P
 			return true;
 		}
 
-        if (last_response.getValballot() > this.valballot) {
-            this.valballot = last_response.getValballot() ;
-            this.value = last_response.getValue();
+        for (DidaTradePaxos.LogEntry entry: last_response.getLogList()) {
+            int slot   = entry.getInstance();
+            int value  = entry.getValue();
+            int ballot = entry.getValballot();
+
+            if (!this.valballot.containsKey(slot) || this.valballot.get(slot) < ballot) {
+                this.valballot.put(slot, ballot);
+                this.values.put(slot, value);
+            }
         }
 
         if (this.responses >= this.quorum) {
             return true;
         }
-    
+
         return false;
     }
 }

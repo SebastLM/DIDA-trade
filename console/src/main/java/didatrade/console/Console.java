@@ -140,7 +140,7 @@ public class Console {
 				int reqid = sequence_number*100 + client_id;
 
 				DidaTradeMaster.NewBallotRequest.Builder newballot_request = DidaTradeMaster.NewBallotRequest.newBuilder();
-				ArrayList<DidaTradeMaster.NewBallotReply> newballot_responses = new ArrayList<DidaTradeMaster.NewBallotReply>();; 
+				ArrayList<DidaTradeMaster.NewBallotReply> newballot_responses = new ArrayList<DidaTradeMaster.NewBallotReply>(); 
 				GenericResponseCollector<DidaTradeMaster.NewBallotReply> newballot_collector = new GenericResponseCollector<DidaTradeMaster.NewBallotReply>(newballot_responses, 1);
 				CollectorStreamObserver<DidaTradeMaster.NewBallotReply> newballot_observer =  new CollectorStreamObserver<DidaTradeMaster.NewBallotReply>(newballot_collector);
 				newballot_request.setReqid(reqid);

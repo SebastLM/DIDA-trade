@@ -32,8 +32,8 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		boolean accepted      = false;
 		int  value            = entry.command_id;
 		int  valballot        = entry.write_ballot;
-
-		if (ballot >= this.server_state.getCurrentBallot()) {              
+		
+		if (ballot >= this.server_state.getCurrentBallot()) {
 			accepted = true;
 			this.server_state.setCurrentBallot(ballot);
 		}
@@ -51,10 +51,24 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		response_builder.setValballot(valballot);
 		response_builder.setMaxballot(maxballot);
 
+		int i = instance;
+
+		PaxosInstance entry = this.server_state.paxos_log.getEntry(i);
+		while (entry != null) {
+			if (entry.write_ballot > -1) {
+				DidaTradePaxos.LogEntry.Builder log_entry_builder = DidaTradePaxos.LogEntry.newBuilder();
+				log_entry_builder.setInstance(i);
+				log_entry_builder.setValue(entry.command_id);
+				log_entry_builder.setValballot(entry.write_ballot);
+				response_builder.addLog(log_entry_builder.build());
+			}
+			i++;
+			entry = this.server_state.paxos_log.getEntry(i);
+		}
+
 		DidaTradePaxos.PhaseOneReply response = response_builder.build();
 
 		// System.out.println("Sending phase1 response: " + response);
-		
 		responseObserver.onNext(response);
 		responseObserver.onCompleted();
     }
@@ -64,7 +78,7 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		// System.out.println ("Receive phase two request: \n" + request);
 		this.server_state.getDebugHandler().verifyDebug();
 		int instance          = request.getInstance();
-		int ballot            = request.getRequestballot();
+		int ballot            = request.getRequestballot(instance);
 		int value             = request.getValue();
 		PaxosInstance entry   = this.server_state.paxos_log.testAndSetEntry(instance);
 		boolean accepted      = false;
@@ -72,12 +86,12 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 
 		if (ballot >= this.server_state.getCurrentBallot()) {
 			accepted           = true;
-			entry.command_id   = value; 
+			entry.command_id   = value;
 			entry.write_ballot = ballot;
 			this.server_state.setCurrentBallot(ballot);
 		}
 		else
-			maxballot = this.server_state.getCurrentBallot();
+			maxballot = this.server_state.getCurrentBallot(instance);
 		
 
 		DidaTradePaxos.PhaseTwoReply.Builder response_builder = DidaTradePaxos.PhaseTwoReply.newBuilder();
@@ -145,7 +159,7 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		System.out.println("Paxos learner for instance " + instance + " : number of accepts " +  entry.n_accepts);
 		if (entry.n_accepts >= this.server_state.scheduler.quorum(ballot)) {
 		    System.out.println("Paxos learner: waking up the main loop");
-		    this.server_state.updateCompletedBallot(ballot);
+		    this.server_state.updateCompletedBallot(ballot, instance);
 		    entry.decided = true;
 		    this.server_state.main_loop.wakeup();
 		}

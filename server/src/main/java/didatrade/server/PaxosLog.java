@@ -4,8 +4,8 @@ import java.util.Hashtable;
 
 
 public class PaxosLog {
-    private Hashtable<Integer, PaxosInstance>  log;
-     
+    private Hashtable<Integer, PaxosInstance> log;
+
     public PaxosLog() {
 	this.log = new Hashtable<Integer, PaxosInstance>();
     }
@@ -13,12 +13,11 @@ public class PaxosLog {
     public synchronized int length() {
         return this.log.size();
     }
-    
+
     public synchronized PaxosInstance getEntry(int position) {
         return this.log.get(position);
     }
-   
-   
+
     public synchronized PaxosInstance testAndSetEntry(int position) {
 	PaxosInstance entry = this.log.get(position);
 
@@ -29,7 +28,6 @@ public class PaxosLog {
 	return entry;
     }
 
-    
     public synchronized PaxosInstance testAndSetEntry(int position, int ballot) {
         PaxosInstance entry = this.log.get(position);
 
@@ -38,5 +36,5 @@ public class PaxosLog {
             this.log.put (position, entry);
         }
         return entry;
-    }
+    } 
 }
