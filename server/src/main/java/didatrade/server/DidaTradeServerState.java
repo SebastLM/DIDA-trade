@@ -30,8 +30,12 @@ public class DidaTradeServerState {
     ManagedChannel[]            channels;
     DidaTradePaxosServiceGrpc.DidaTradePaxosServiceStub[] async_stubs;
 
-    private int                 current_ballot;
-    private int                 completed_ballot;
+	// TODO: this will probabily needs to be a list (index by paxos instance)
+    private ArrayList<Integer>      current_ballot;
+	
+	// TODO: this will probabily needs to be a list (index by paxos instance)
+    private ArrayList<Integer>                 completed_ballot;
+
     private int                 debug_mode;
     private boolean             fastpaxos_on;
  
@@ -48,7 +52,7 @@ public class DidaTradeServerState {
 	this.debug_mode       = 0;
 	this.fastpaxos_on     = false;
 	this.current_ballot   = 0;
-	this.completed_ballot = -1;
+	this.completed_ballot = ;
 	this.req_history      = new RequestHistory();
 	this.paxos_log        = new PaxosLog();
 	this.main_loop        = new MainLoop(this);
