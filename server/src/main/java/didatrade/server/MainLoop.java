@@ -57,7 +57,9 @@ public class MainLoop implements Runnable  {
 						for (Map.Entry<Integer, Integer> entry : phase_two_values.entrySet()) {
 							int slot = entry.getKey();
 							int value = entry.getValue();
-							this.processPhaseTwo(value, ballot, slot);
+							if (!this.processPhaseTwo(value, ballot, slot)) {
+								break;
+							}
 						}
 					}
 				}
@@ -90,7 +92,7 @@ public class MainLoop implements Runnable  {
 	private synchronized void waitForWork() {
 		while (this.has_work == false) {
 			try {
-				wait();
+				wait(); 
 			} catch (InterruptedException e) {
 				System.out.println("Waited interrupted" + e.getMessage());
 			}
