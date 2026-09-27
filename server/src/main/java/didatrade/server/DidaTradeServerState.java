@@ -42,7 +42,6 @@ public class DidaTradeServerState {
     Thread                      main_loop_worker;
 
 	DebugModeHandler 			debug;
-	int 						max_instance;
 
 	// This is the last ballot we performed Phase 1
 	int 						last_prepared_ballot;
@@ -61,7 +60,6 @@ public class DidaTradeServerState {
 	this.paxos_log        	  = new PaxosLog();
 	this.main_loop        	  = new MainLoop(this);
 	this.debug 				  = debug;
-	this.max_instance 		  = this.paxos_log.length();
 	this.last_prepared_ballot = 0;
 
 	// populate manager
@@ -188,10 +186,6 @@ public class DidaTradeServerState {
 	// decoupling purposes
 	public void doDebug() {
 		this.debug.doDebugMode(this.debug_mode);
-	}
-
-	public int add_instance() {
-		return this.max_instance++;
 	}
 
 }
