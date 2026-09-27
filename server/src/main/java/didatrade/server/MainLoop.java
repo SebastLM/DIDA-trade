@@ -1,7 +1,7 @@
 package didatrade.server;
 
 import java.util.*;
-
+import java.util.concurrent.*
 import didatrade.DidaTradeMain;
 import didatrade.DidaTradePaxos;
 import didatrade.DidaTradePaxosServiceGrpc;
@@ -29,11 +29,37 @@ public class MainLoop implements Runnable  {
     private ManagedChannel[] channels;
     private DidaTradePaxosServiceGrpc.DidaTradePaxosServiceStub[] async_stubs;
 
+	private int next_slot_to_dispatch;
+    private final Semaphore window = new Semaphore(6); // window size 6
+
     public MainLoop(DidaTradeServerState state) {
 		this.server_state   = state;
 		this.has_work       = false;
 		this.next_log_entry = -1;
+		this.next_slot_to_dispatch = 0;
     }
+
+	// void dispatchLoop() {
+	// 	/*
+	// 	while (fase1)
+	// 	*/
+    //     while (true) {
+    //         try {
+    //             window.acquire();
+    //         } catch (InterruptedException e) {
+    //             continue;
+    //         }
+
+    //         this.next_slot_to_dispatch++;
+    //         pool.submit(() -> {
+    //             try {
+    //                 // call the async function that will run the actual async logic
+    //             } finally {
+    //                 window.release();
+    //             }
+    //         });
+    //     }
+    // }
 
     public void run() {
 
@@ -42,25 +68,24 @@ public class MainLoop implements Runnable  {
 			this.next_log_entry++;
 			PaxosInstance next_entry = this.server_state.paxos_log.testAndSetEntry(next_log_entry);
 			RequestRecord record = this.server_state.req_history.getFirstPending();
-			
-			while (next_entry.decided == false) {
+
+			while(next_entry.decided == false) {
+
 				// keep re-checking
 				if (record == null) {
 					record = this.server_state.req_history.getFirstPending();
 				}
 
 				int ballot = this.server_state.getCurrentBallot();
-				if ((record != null && this.server_state.scheduler.leader(ballot) == this.server_state.my_id) && this.server_state.getLastPreparedBallot() < ballot) {
+				if ((this.server_state.scheduler.leader(ballot) == this.server_state.my_id) && this.server_state.getLastPreparedBallot() < ballot) {
 					Map<Integer, Integer> phase_two_values = this.processPhaseOne(this.next_log_entry, ballot);
 					if (phase_two_values != null) {
 						this.recovered_values = phase_two_values;
-						for (Map.Entry<Integer, Integer> entry : phase_two_values.entrySet()) {
-							int slot = entry.getKey();
-							int value = entry.getValue();
-							if (!this.processPhaseTwo(value, ballot, slot)) {
-								break;
-							}
+						for (int slot = this.next_log_entry; slot < phase_two_values.size(); slot++) {
+							int value = phase_two_values.get(slot);
+							this.processPhaseTwo(value, ballot, slot);
 						}
+					this.next_slot_to_dispatch = this.next_log_entry;
 					}
 				}
 
@@ -69,30 +94,35 @@ public class MainLoop implements Runnable  {
 					if (recovered != null) {
 						this.processPhaseTwo(recovered, ballot, this.next_log_entry);
 					} else if (record != null) {
-						this.processPhaseTwo(record.getId(), ballot, this.next_log_entry);
+						this.processPhaseTwo(record.getId(), ballot, this.next_slot_to_dispatch);
+						this.next_slot_to_dispatch++;
 					}
 				}
-
+			
 				if (next_entry.decided == false) {
 					System.out.println("Entry not decided: waiting");
 					this.waitForWork();
+					
 				}
 			}
+			
 			System.out.println("Log entry with number " + this.next_log_entry + " has been decided with command id = "+ next_entry.command_id);
 			this.execute_tx(next_entry.command_id);
 			this.recovered_values.remove(this.next_log_entry);
 		}
 	}
 
+
 	public synchronized void wakeup() {
 		this.has_work = true;
 		notify();
 	}
+	
 
 	private synchronized void waitForWork() {
 		while (this.has_work == false) {
 			try {
-				wait(); 
+				wait();
 			} catch (InterruptedException e) {
 				System.out.println("Waited interrupted" + e.getMessage());
 			}
@@ -144,7 +174,13 @@ public class MainLoop implements Runnable  {
 	}
 
 	// Returns true if the value was accepted by a quorum
-	boolean processPhaseTwo(int value, int ballot, int entry_number) {
+	void processPhaseTwo(int value, int ballot, int entry_number) {
+		try {
+            window.acquire();
+        } catch (InterruptedException e) {
+    	
+		}
+
 		System.out.println("Going to run paxos phase 2");
 		PaxosInstance next_entry = this.server_state.paxos_log.testAndSetEntry(entry_number);
 
@@ -162,7 +198,7 @@ public class MainLoop implements Runnable  {
 
 		System.out.println("Calling peers with phase_two_request = " + phase_two_request);
 		ArrayList<DidaTradePaxos.PhaseTwoReply> phase_two_responses = new ArrayList<DidaTradePaxos.PhaseTwoReply>();
-		GenericResponseCollector<DidaTradePaxos.PhaseTwoReply> phase_two_collector = new GenericResponseCollector<DidaTradePaxos.PhaseTwoReply>(phase_two_responses, n_acceptors, phase_two_processor);
+		GenericResponseCollector<DidaTradePaxos.PhaseTwoReply> phase_two_collector = new GenericResponseCollector<DidaTradePaxos.PhaseTwoReply>(phase_two_responses, n_acceptors, phase_two_processor, () -> this.onPhaseTwoDone(phase_one_processor, value, ballot, entry_number, null));
 
 		for (int i = 0; i < n_acceptors  ; i++) {
 			CollectorStreamObserver<DidaTradePaxos.PhaseTwoReply> phase_two_observer = new CollectorStreamObserver<DidaTradePaxos.PhaseTwoReply>(phase_two_collector);
@@ -170,20 +206,24 @@ public class MainLoop implements Runnable  {
 		}
 
 		System.out.println("Waiting for responses...");
-		phase_two_collector.waitUntilDone();
+		return;
+	}
 
+	private void onPhaseTwoDone(PhaseTwoResponseProcessor phase_two_processor, int value, int ballot, int entry_number) {
 		if (phase_two_processor.getAccepted() == false) {
 			this.server_state.setCurrentBallot(phase_two_processor.getMaxballot());
-
 			System.out.println("Paxos phase 2 ended with ballot_aborted for entry: " + entry_number + "ballot: " + ballot);
-			return false;
+			return;
+		} else {
+			PaxosInstance entry = this.server_state.paxos_log.testAndSetEntry(entry_number);
+			synchronized (entry) {
+				entry.command_id = value;
+				entry.decided = true;
+			}
+			window.release();
+			return;
 		}
-
-		next_entry.command_id = value;
-		next_entry.decided = true;
-
-		return true;
-	}
+    }
 
 	public Boolean execute_tx(int command_id) {
 
