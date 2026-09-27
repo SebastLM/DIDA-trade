@@ -1,7 +1,9 @@
 package didatrade.util;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Map;
 
 import didatrade.DidaTradePaxos;
 import didatrade.DidaTradePaxosServiceGrpc;
@@ -14,26 +16,22 @@ public class PhaseOneProcessor extends GenericResponseProcessor<DidaTradePaxos.P
     private Map<Integer, Integer>    values;
     private Map<Integer, Integer>    valballot;
     private int                      maxballot;
-    private int                      low_ballot;
-    private int                      high_ballot;
     private int                      responses;
     private int                      quorum;
 
-    public PhaseOneProcessor(ConfigurationScheduler s, int l, int h, int q) {
+    public PhaseOneProcessor(ConfigurationScheduler s, int q) {
 	// System.out.println("Phase 1 processor constructor with low_ballot =" + l + " high_ballot = " + h);
     this.accepted    = true;
 	this.values      = new HashMap<>();
     this.valballot   = new HashMap<>();
 	this.maxballot   = -1;
-	this.low_ballot  = l;
-	this.high_ballot = h;
 	this.scheduler   = s;
     this.quorum = q;
     this.responses = 0;
     }
 
     public boolean getAccepted() {
-	    return this.accepted;
+		return this.accepted;
     }
 
     public Map<Integer, Integer> getValues() {

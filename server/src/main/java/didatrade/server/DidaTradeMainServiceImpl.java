@@ -65,7 +65,7 @@ public class DidaTradeMainServiceImpl extends DidaTradeMainServiceGrpc.DidaTrade
 
 	RequestRecord request_record = new RequestRecord (reqid, command);
 	this.server_state.req_history.addToPending (reqid, request_record);
-	this.server_state.main_loop.wakeup ();
+	this.server_state.main_loop.wakeup();
 	boolean result = request_record.waitForResponse();
 
 	// for debug purposes
@@ -159,7 +159,7 @@ public class DidaTradeMainServiceImpl extends DidaTradeMainServiceGrpc.DidaTrade
 
 	RequestRecord request_record = new RequestRecord (reqid, command);
 	this.server_state.req_history.addToPending (reqid, request_record);
-	this.server_state.main_loop.wakeup ();
+	this.server_state.main_loop.wakeup();
 	boolean result = request_record.waitForResponse();
 
 	// for debug purposes
@@ -190,7 +190,7 @@ public class DidaTradeMainServiceImpl extends DidaTradeMainServiceGrpc.DidaTrade
 
       RequestRecord request_record = new RequestRecord (reqid, command);
       this.server_state.req_history.addToPending (reqid, request_record);
-      this.server_state.main_loop.wakeup ();
+      this.server_state.main_loop.wakeup();
       boolean result = request_record.waitForResponse();
 
       // for debug purposes
