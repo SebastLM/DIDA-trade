@@ -20,20 +20,13 @@ public class DidaTradeMasterServiceImpl extends DidaTradeMasterServiceGrpc.DidaT
 	int new_ballot       = request.getNewballot();
 	int completed_ballot = request.getCompletedballot();
 
-	int instance = this.server_state.add_instance();
 	// for debug purposes
 	System.out.println("Current ballot = " + this.server_state.getCurrentBallot() + " new ballot = " + new_ballot + " completed ballot = " + completed_ballot);
-
-	this.server_state.setCompletedBallot(completed_ballot, instance); // TODO
 
 	if (new_ballot > this.server_state.getCurrentBallot()) {
 	    this.server_state.setCurrentBallot (new_ballot);
 
 	    this.server_state.main_loop.wakeup();
-
-	    completed_ballot = this.server_state.waitForCompletedBallot(new_ballot, instance);
-	} else {
-	    completed_ballot = this.server_state.getCompletedBallot(instance);
 	}
 
 	DidaTradeMaster.NewBallotReply.Builder response_builder = DidaTradeMaster.NewBallotReply.newBuilder();

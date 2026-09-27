@@ -144,9 +144,6 @@ public class DidaTradeServerState {
 		this.notifyAll();
     }
 
-    
-
-
 	public synchronized void setCompletedBallot (int ballot, int instance) {
 		while (this.completed_ballot.size() <= instance) {
 			this.completed_ballot.add(-1);
