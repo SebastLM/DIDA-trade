@@ -31,22 +31,26 @@ public class DidaTradeServerState {
     DidaTradePaxosServiceGrpc.DidaTradePaxosServiceStub[] async_stubs;
 
     private int  current_ballot;
-	
-	// TODO: this will probabily needs to be a list (index by paxos instance)
+
     private ArrayList<Integer>  completed_ballot;
 
     private int                 debug_mode;
     private boolean             fastpaxos_on;
- 
+
     MainLoop                    main_loop;
     Thread                      main_loop_worker;
 
 	DebugModeHandler 			debug;
 
-	// This is the last ballot we performed Phase 1
+	/*
+		[proposer] Multipaxos Phase 1
+		Store the last ballot num that this proposer
+		did phase 1 so that in the future if we wake up
+		we know that we may need to do it again.
+	*/
 	int 						last_prepared_ballot;
 
-    
+
     public DidaTradeServerState(int port, int myself, char schedule, DebugModeHandler debug) {
 	this.trade_manager    	  = new TradeManager();
 	this.scheduler        	  = new ConfigurationScheduler (schedule);
@@ -151,7 +155,6 @@ public class DidaTradeServerState {
 		this.notifyAll();
     }
 
-    
     public synchronized int waitForCompletedBallot(int ballot, int instance) {
         while (this.completed_ballot.get(instance) < ballot) {
             try {

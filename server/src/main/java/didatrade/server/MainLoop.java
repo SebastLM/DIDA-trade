@@ -39,28 +39,6 @@ public class MainLoop implements Runnable  {
 		this.next_slot_to_dispatch = 0;
     }
 
-	// void dispatchLoop() {
-	// 	/*
-	// 	while (fase1)
-	// 	*/
-    //     while (true) {
-    //         try {
-    //             window.acquire();
-    //         } catch (InterruptedException e) {
-    //             continue;
-    //         }
-
-    //         this.next_slot_to_dispatch++;
-    //         pool.submit(() -> {
-    //             try {
-    //                 // call the async function that will run the actual async logic
-    //             } finally {
-    //                 window.release();
-    //             }
-    //         });
-    //     }
-    // }
-
     public void run() {
 
 		while (true) {

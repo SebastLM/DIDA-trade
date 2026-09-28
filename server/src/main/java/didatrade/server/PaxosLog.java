@@ -1,6 +1,8 @@
 package didatrade.server;
 
+import java.util.ArrayList;
 import java.util.Hashtable;
+import java.util.List;
 
 
 public class PaxosLog {
@@ -33,8 +35,19 @@ public class PaxosLog {
 
         if (entry == null){
             entry = new PaxosInstance(position, ballot);
-            this.log.put (position, entry);
+            this.log.put(position, entry);
         }
         return entry;
-    } 
+    }
+
+	public synchronized List<PaxosInstance> entriesFrom(int position) {
+		List<PaxosInstance> entries = new ArrayList<>();
+		for (PaxosInstance entry: this.log.values()) {
+			if (entry.instance_nb >= position) {
+				entries.add(entry);
+			}
+		}
+
+		return entries;
+	}
 }

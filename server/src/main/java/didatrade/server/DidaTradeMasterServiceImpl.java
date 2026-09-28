@@ -31,7 +31,7 @@ public class DidaTradeMasterServiceImpl extends DidaTradeMasterServiceGrpc.DidaT
 
 	DidaTradeMaster.NewBallotReply.Builder response_builder = DidaTradeMaster.NewBallotReply.newBuilder();
 	response_builder.setReqid(request_id);
-	response_builder.setCompletedballot(completed_ballot); // TODO
+	response_builder.setCompletedballot(completed_ballot);
 
 	DidaTradeMaster.NewBallotReply response = response_builder.build();
 	responseObserver.onNext(response);
