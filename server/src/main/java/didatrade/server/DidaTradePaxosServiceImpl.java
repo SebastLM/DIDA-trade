@@ -50,10 +50,14 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		response_builder.setValballot(valballot);
 		response_builder.setMaxballot(maxballot);
 
-		int max_position = this.server_state.paxos_log.length();
-		for (int i = instance; i < max_position; i++) {
+		int remaining = this.server_state.paxos_log.length();
+		for (int i = 0; remaining > 0; i++) {			
 			PaxosInstance cur_entry = this.server_state.paxos_log.getEntry(i);
-			if (cur_entry != null && cur_entry.write_ballot > -1) {
+			if (cur_entry == null) {
+				continue;
+			}
+			remaining--;
+			if (i >= instance && cur_entry.write_ballot > -1) {
 				DidaTradePaxos.LogEntry.Builder log_entry_builder = DidaTradePaxos.LogEntry.newBuilder();
 				log_entry_builder.setInstance(i);
 				log_entry_builder.setValue(cur_entry.command_id);

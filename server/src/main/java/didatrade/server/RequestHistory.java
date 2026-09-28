@@ -25,6 +25,16 @@ public class RequestHistory {
 	else
 	    return null;
     }
+
+    public synchronized RequestRecord getFirstNotProposed() {
+        Enumeration<Integer> pendingids = this.pending.keys();
+        while (pendingids.hasMoreElements()) {
+            RequestRecord record = this.pending.get(pendingids.nextElement());
+            if (!record.isProposed())
+                return record;
+        }
+        return null;
+    }
    
     public synchronized RequestRecord getIfProcessed(int requestid) {
 	Integer id = new Integer(requestid);

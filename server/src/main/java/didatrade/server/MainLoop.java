@@ -1,7 +1,7 @@
 package didatrade.server;
 
 import java.util.*;
-import java.util.concurrent.*
+import java.util.concurrent.*;
 import didatrade.DidaTradeMain;
 import didatrade.DidaTradePaxos;
 import didatrade.DidaTradePaxosServiceGrpc;
@@ -81,21 +81,31 @@ public class MainLoop implements Runnable  {
 					Map<Integer, Integer> phase_two_values = this.processPhaseOne(this.next_log_entry, ballot);
 					if (phase_two_values != null) {
 						this.recovered_values = phase_two_values;
-						for (int slot = this.next_log_entry; slot < phase_two_values.size(); slot++) {
-							int value = phase_two_values.get(slot);
+						this.next_slot_to_dispatch = Math.max(this.next_slot_to_dispatch, this.next_log_entry);
+
+						int recover = phase_two_values.size();
+						for (int slot = this.next_log_entry; recover > 0; slot++) {
+							Integer value = phase_two_values.get(slot);
+							if (value == null) {
+								value = -1;
+							} else {
+								recover--;
+							}
 							this.processPhaseTwo(value, ballot, slot);
+							this.next_slot_to_dispatch = Math.max(this.next_slot_to_dispatch, slot + 1);
 						}
-					this.next_slot_to_dispatch = this.next_log_entry;
 					}
 				}
 
 				if ((next_entry.decided == false && this.server_state.scheduler.leader(ballot) == this.server_state.my_id) && this.server_state.getLastPreparedBallot() == ballot) {
-					Integer recovered = this.recovered_values.get(this.next_log_entry);
-					if (recovered != null) {
-						this.processPhaseTwo(recovered, ballot, this.next_log_entry);
-					} else if (record != null) {
-						this.processPhaseTwo(record.getId(), ballot, this.next_slot_to_dispatch);
-						this.next_slot_to_dispatch++;
+					RequestRecord request = this.server_state.req_history.getFirstNotProposed();
+					while (request != null) {
+						request.setProposed(true);
+						if (!this.recovered_values.containsValue(request.getId())) {
+							this.processPhaseTwo(request.getId(), ballot, this.next_slot_to_dispatch);
+							this.next_slot_to_dispatch++;
+						}
+						request = this.server_state.req_history.getFirstNotProposed();
 					}
 				}
 			
@@ -107,7 +117,9 @@ public class MainLoop implements Runnable  {
 			}
 			
 			System.out.println("Log entry with number " + this.next_log_entry + " has been decided with command id = "+ next_entry.command_id);
-			this.execute_tx(next_entry.command_id);
+			if (next_entry.command_id != -1) {
+				this.execute_tx(next_entry.command_id);
+			}
 			this.recovered_values.remove(this.next_log_entry);
 		}
 	}
@@ -198,7 +210,7 @@ public class MainLoop implements Runnable  {
 
 		System.out.println("Calling peers with phase_two_request = " + phase_two_request);
 		ArrayList<DidaTradePaxos.PhaseTwoReply> phase_two_responses = new ArrayList<DidaTradePaxos.PhaseTwoReply>();
-		GenericResponseCollector<DidaTradePaxos.PhaseTwoReply> phase_two_collector = new GenericResponseCollector<DidaTradePaxos.PhaseTwoReply>(phase_two_responses, n_acceptors, phase_two_processor, () -> this.onPhaseTwoDone(phase_one_processor, value, ballot, entry_number, null));
+		GenericResponseCollector<DidaTradePaxos.PhaseTwoReply> phase_two_collector = new GenericResponseCollector<DidaTradePaxos.PhaseTwoReply>(phase_two_responses, n_acceptors, phase_two_processor, () -> this.onPhaseTwoDone(phase_two_processor, value, ballot, entry_number));
 
 		for (int i = 0; i < n_acceptors  ; i++) {
 			CollectorStreamObserver<DidaTradePaxos.PhaseTwoReply> phase_two_observer = new CollectorStreamObserver<DidaTradePaxos.PhaseTwoReply>(phase_two_collector);

@@ -6,6 +6,7 @@ public class RequestRecord {
     private DidaTradeCommand request;
     private boolean response_available;
     private boolean response_value;
+    private boolean proposed = false;
     
     public RequestRecord(int id) {
 	this.requestid = id;
@@ -36,6 +37,14 @@ public class RequestRecord {
 
     public boolean getResponseValue() {
         return this.response_value;
+    }
+
+    public synchronized boolean isProposed() {
+	    return this.proposed;
+    }
+
+    public synchronized void setProposed(boolean p) {
+        this.proposed = p;
     }
 
     public synchronized void setResponse(boolean resp) {
