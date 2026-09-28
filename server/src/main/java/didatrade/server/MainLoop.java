@@ -49,7 +49,6 @@ public class MainLoop implements Runnable  {
 
 			while(next_entry.decided == false) {
 
-				// keep re-checking
 				if (record == null) {
 					record = this.server_state.req_history.getFirstPending();
 				}
@@ -77,7 +76,7 @@ public class MainLoop implements Runnable  {
 
 				if ((next_entry.decided == false && this.server_state.scheduler.leader(ballot) == this.server_state.my_id) && this.server_state.getLastPreparedBallot() == ballot) {
 					RequestRecord request = this.server_state.req_history.getFirstNotProposed();
-					while (request != null) {
+					while (request != null && this.server_state.getCurrentBallot() == ballot) {
 						request.setProposed(true);
 						if (!this.recovered_values.containsValue(request.getId())) {
 							this.processPhaseTwo(request.getId(), ballot, this.next_slot_to_dispatch);
@@ -86,14 +85,14 @@ public class MainLoop implements Runnable  {
 						request = this.server_state.req_history.getFirstNotProposed();
 					}
 				}
-			
+
 				if (next_entry.decided == false) {
 					System.out.println("Entry not decided: waiting");
 					this.waitForWork();
-					
+
 				}
 			}
-			
+
 			System.out.println("Log entry with number " + this.next_log_entry + " has been decided with command id = "+ next_entry.command_id);
 			if (next_entry.command_id != -1) {
 				this.execute_tx(next_entry.command_id);
