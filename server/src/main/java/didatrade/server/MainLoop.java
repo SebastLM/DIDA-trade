@@ -190,7 +190,8 @@ public class MainLoop implements Runnable  {
 		try {
             window.acquire();
         } catch (InterruptedException e) {
-    	
+			Thread.currentThread().interrupt();
+			return;
 		}
 
 		System.out.println("Going to run paxos phase 2");
@@ -225,6 +226,12 @@ public class MainLoop implements Runnable  {
 		if (phase_two_processor.getAccepted() == false) {
 			this.server_state.setCurrentBallot(phase_two_processor.getMaxballot());
 			System.out.println("Paxos phase 2 ended with ballot_aborted for entry: " + entry_number + "ballot: " + ballot);
+			
+			RequestRecord request = this.server_state.req_history.getIfPending(value);
+			if (request != null) {
+				request.setProposed(false);
+			}
+			window.release();
 			return;
 		} else {
 			PaxosInstance entry = this.server_state.paxos_log.testAndSetEntry(entry_number);
@@ -233,6 +240,7 @@ public class MainLoop implements Runnable  {
 				entry.decided = true;
 			}
 			window.release();
+			wakeup();
 			return;
 		}
     }
