@@ -41,9 +41,29 @@ public class MainLoop implements Runnable  {
 
     public void run() {
 		/*
-		TODO: Comment and refactor run()
-		Main loop that runs MultiPaxos core:
+			Main loop that runs the Multi-Paxos core:
+
+			When this server becomes leader of a ballot, run() first runs Phase 1 (once per ballot) to
+			learn what the acceptors already accepted from next_log_entry onward.
+
+			It then runs Phase 2 to re-propose each recovered value in its own instance, filling gaps
+			with no-ops (-1).
+
+			After that, it runs Phase 2 for new client requests, each in the next free instance
+			(next_slot_to_dispatch).
+
+			Instances are still executed in order: run() only applies next_log_entry once it is decided.
+
+			!! Why Phase 2 does not wait:
+
+				Multi-Paxos: run() keeps starting Phase 2 for the next requests, without waiting for
+				earlier instances to be accepted. Several instances are in flight at once.
+
+				The result is handled by the gRPC thread that delivers the last reply needed:
+					it calls onPhaseTwoDone(), which marks the instance decided
+					(or raises the ballot on rejection) and wakes run().
 		*/
+
 		while (true) {
 
 			this.next_log_entry++;
@@ -149,6 +169,20 @@ public class MainLoop implements Runnable  {
 			this.server_state.async_stubs[acceptors.get(i)].phaseone(phase_one_request, phase_one_observer);
 		}
 
+		/*
+			!! Why waitUntilDone() and not waitForQuorum():
+
+			We still only wait for a quorum PhaseOneProcessor.onNext() returns true as soon as a quorum 
+			has replier or as soon as one acceptor rejects.
+
+			waitForQuorum() is not safe here:
+				It also returns when every RPC failed, even though fewer than a quorum answered.
+				The caller cannot tell this apart from success.
+
+			So we always return, and PhaseOneProcessor.getAccepted() checks both no rejection and
+			responses >= quorum. If there is no quorum, we fail this round and retry/sleep below. That keeps
+			safety (no progress without a majority) and liveness.
+        */
 		phase_one_collector.waitUntilDone();
 
 		// Phase one didnt work
