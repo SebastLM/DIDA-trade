@@ -40,7 +40,11 @@ public class MainLoop implements Runnable  {
     }
 
     public void run() {
-
+		/*
+		Main loop that runs MultiPaxos core:
+		
+		
+		*/
 		while (true) {
 
 			this.next_log_entry++;
@@ -225,6 +229,17 @@ public class MainLoop implements Runnable  {
 	public Boolean execute_tx(int command_id) {
 
 			RequestRecord record = this.server_state.req_history.getIfPending(command_id);
+
+			/*
+			Make execution idempotent by skiping commands that were already executed.
+
+			Multipaxos "allows" this to happen, was explain in classes that either the app should address it or 
+			the consesus implementation address it, we decided to address it.
+			*/
+			if (this.server_state.req_history.getIfProcessed(command_id) != null) {
+				System.out.println("This command: " + command_id + " was already executed.");
+				return false;
+			}
 
 			while (record == null) {
 				waitForWork();
