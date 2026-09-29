@@ -41,9 +41,8 @@ public class MainLoop implements Runnable  {
 
     public void run() {
 		/*
+		TODO: Comment and refactor run()
 		Main loop that runs MultiPaxos core:
-		
-		
 		*/
 		while (true) {
 
@@ -62,7 +61,7 @@ public class MainLoop implements Runnable  {
 					Map<Integer, Integer> phase_two_values = this.processPhaseOne(this.next_log_entry, ballot);
 					if (phase_two_values != null) {
 						this.recovered_values = phase_two_values;
-						this.next_slot_to_dispatch = Math.max(this.next_slot_to_dispatch, this.next_log_entry);
+						this.next_slot_to_dispatch = this.next_log_entry;
 
 						int recover = phase_two_values.size();
 						for (int slot = this.next_log_entry; recover > 0; slot++) {

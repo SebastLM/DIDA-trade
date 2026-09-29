@@ -19,7 +19,9 @@ public class PhaseTwoResponseProcessor extends GenericResponseProcessor<DidaTrad
     }
 
     public boolean getAccepted() {
-		return this.accepted;
+        // The this.responses >= this.quorum was not on the base code but if we dont get a majority of responses 
+        // (E.g: one acceptor lives and others are dead) then we should not be allowed to make progress
+		return this.accepted && this.responses >= this.quorum;
     }
 
     public int getMaxballot() {
