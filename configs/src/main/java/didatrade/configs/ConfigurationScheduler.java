@@ -13,23 +13,29 @@ public class ConfigurationScheduler {
     }
 
     public ConfigurationScheduler(char option) {
-	if (option == 'C')
-	    s = new ScheduleC ();
-	if (option == 'B')
-	    s = new ScheduleB ();
-	else 
-	    s = new ScheduleA ();
+        if (option == 'C') {
+            s = new ScheduleC ();
+        }
+
+        if (option == 'B') {
+            s = new ScheduleB ();
+        }
+        // Default to 'A'
+        else {
+            s = new ScheduleA ();
+        }
     }
 
-    public void setSchedule (char option) {
-	if (option == 'A')
-	    s = new ScheduleA ();
-	else if (option == 'B')
-	    s = new ScheduleB ();   
- 	else if (option == 'C')
-	    s = new ScheduleC ();   
+    public void setSchedule(char option) {
+        if (option == 'A') {
+            s = new ScheduleA();
+        } else if (option == 'B') {
+            s = new ScheduleB();
+        } else if (option == 'C') {
+            s = new ScheduleC();
+        }
     }
-    
+
     public List<Integer> learners(int ballot) {
 	return s.learners(ballot);
     }

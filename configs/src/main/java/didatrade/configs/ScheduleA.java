@@ -35,17 +35,17 @@ public class ScheduleA extends Schedule {
 	return this.all_participants;
     }
     
-    public Integer leader (int ballot) {
+    public Integer leader(int ballot) {
 	int leader = ballot % 3;
 	
 	return new Integer(leader);
     }
 
-    public Integer quorum (int ballot) {
+    public Integer quorum(int ballot) {
 	return new Integer(2);
     }
     
-    public boolean fastpaxos (int ballot) {
+    public boolean fastpaxos(int ballot) {
 	return ((ballot % 3) == 0);
     }
 }

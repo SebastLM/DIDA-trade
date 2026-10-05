@@ -63,7 +63,6 @@ public class MainLoop implements Runnable  {
 					it calls onPhaseTwoDone(), which marks the instance decided
 					(or raises the ballot on rejection) and wakes run().
 		*/
-
 		while (true) {
 
 			this.next_log_entry++;
@@ -98,14 +97,20 @@ public class MainLoop implements Runnable  {
 				}
 
 				if ((next_entry.decided == false && this.server_state.scheduler.leader(ballot) == this.server_state.my_id) && this.server_state.getLastPreparedBallot() == ballot) {
-					RequestRecord request = this.server_state.req_history.getFirstNotProposed();
-					while (request != null && this.server_state.getCurrentBallot() == ballot) {
-						request.setProposed(true);
-						if (!this.recovered_values.containsValue(request.getId())) {
-							this.processPhaseTwo(request.getId(), ballot, this.next_slot_to_dispatch);
-							this.next_slot_to_dispatch++;
+
+					if (this.server_state.scheduler.fastpaxos(this.server_state.getCurrentBallot())) {
+						// run fast paxos
+					} else {
+						// run multi-paxos
+						RequestRecord request = this.server_state.req_history.getFirstNotProposed();
+						while (request != null && this.server_state.getCurrentBallot() == ballot) {
+							request.setProposed(true);
+							if (!this.recovered_values.containsValue(request.getId())) {
+								this.processPhaseTwo(request.getId(), ballot, this.next_slot_to_dispatch);
+								this.next_slot_to_dispatch++;
+							}
+							request = this.server_state.req_history.getFirstNotProposed();
 						}
-						request = this.server_state.req_history.getFirstNotProposed();
 					}
 				}
 

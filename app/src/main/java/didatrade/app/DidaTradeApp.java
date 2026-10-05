@@ -542,7 +542,7 @@ public class DidaTradeApp {
 
 	// set scheduler
 	this.schedule  = args[3].charAt(0);
-	this.scheduler = new ConfigurationScheduler (schedule);
+	this.scheduler = new ConfigurationScheduler(schedule);
 	this.n_servers = scheduler.allparticipants().size();
 
 	// check arguments
