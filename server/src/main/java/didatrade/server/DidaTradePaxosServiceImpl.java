@@ -1,14 +1,15 @@
 
 package didatrade.server;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 import didatrade.DidaTradePaxos;
 import didatrade.DidaTradePaxosServiceGrpc;
-import didatrade.util.GenericResponseCollector;
 import didatrade.util.CollectorStreamObserver;
-import io.grpc.stub.StreamObserver;
+import didatrade.util.GenericResponseCollector;
 import io.grpc.Context;
+import io.grpc.stub.StreamObserver;
 
 public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTradePaxosServiceImplBase {
     DidaTradeServerState server_state;
@@ -139,49 +140,87 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		}
     }
 
-    @Override
-    public void learn(DidaTradePaxos.LearnRequest request, StreamObserver<DidaTradePaxos.LearnReply> responseObserver) {
-	// System.out.println("Receive learn request: \n" + request);
-	this.server_state.getDebugHandler().verifyDebug();
-	int instance         = request.getInstance();
-	int ballot           = request.getBallot();
-	int value            = request.getValue();
+	@Override
+	public void phaseany(DidaTradePaxos.PhaseTwoFastRequest request, StreamObserver<DidaTradePaxos.PhaseTwoFastReply> responseObserver) {
+		this.server_state.getDebugHandler().verifyDebug();
+		int instance          = request.getInstance();
+		int ballot            = request.getRequestballot();
+		boolean accepted      = false;
+		int  maxballot        = ballot;
 
-
-	synchronized (this) {
-	    PaxosInstance entry  = this.server_state.paxos_log.testAndSetEntry(instance);
-
-	    // System.out.println("Paxos learner: learnin entry " + instance + " with timestamp " + ballot);
-
-	    this.server_state.setCurrentBallot(ballot);
-
-	    if (ballot == entry.accept_ballot) {
-		entry.n_accepts++;
-		System.out.println("Paxos learner for instance " + instance + " : number of accepts " +  entry.n_accepts);
-		if (entry.n_accepts >= this.server_state.scheduler.quorum(ballot)) {
-		    System.out.println("Paxos learner: waking up the main loop");
-		    entry.decided = true;
-		    this.server_state.main_loop.wakeup();
+		if (ballot >= this.server_state.getCurrentBallot()) {
+			accepted = true;
+			this.server_state.setCurrentBallot(ballot);
+			//TODO: it needs to remember that from this instance onward it will be accept any value
 		}
-	    }
-	    else if (ballot > entry.accept_ballot) {
-		System.out.println("Paxos learner for instance " + instance + " : resetting ");
-		entry.command_id     = value;
-		entry.accept_ballot  = ballot;
-		entry.n_accepts      = 1;
-	    }
+		else
+			maxballot = this.server_state.getCurrentBallot();
+
+		DidaTradePaxos.PhaseTwoFastReply.Builder response_builder = DidaTradePaxos.PhaseTwoFastReply.newBuilder();
+		response_builder.setAccepted(accepted);
+		response_builder.setServerid(this.server_state.my_id);
+		response_builder.setMaxballot(maxballot);
+
+		DidaTradePaxos.PhaseTwoFastReply response = response_builder.build();
+
+		responseObserver.onNext(response);
+		responseObserver.onCompleted();
 	}
 
-	DidaTradePaxos.LearnReply.Builder response_builder = DidaTradePaxos.LearnReply.newBuilder();
-	response_builder.setInstance(instance);
-	response_builder.setBallot(ballot);
 
-	DidaTradePaxos.LearnReply response = response_builder.build();
+    @Override
+    public void learn(DidaTradePaxos.LearnRequest request, StreamObserver<DidaTradePaxos.LearnReply> responseObserver) {
+		this.server_state.getDebugHandler().verifyDebug();
+		int instance         = request.getInstance();
+		int ballot           = request.getBallot();
+		int value            = request.getValue();
 
-	// System.out.println("Sending learn response");
+		synchronized (this) {
+			PaxosInstance entry  = this.server_state.paxos_log.testAndSetEntry(instance);
 
-	responseObserver.onNext(response);
-	responseObserver.onCompleted();
+			this.server_state.setCurrentBallot(ballot);
+
+			if (this.server_state.scheduler.fastpaxos(ballot)) {
+				if (ballot > entry.accept_ballot) {
+					entry.accept_ballot = ballot;
+					entry.fast_votes.clear();
+				}
+
+				if (ballot == entry.accept_ballot) {
+					int votes = entry.fast_votes.merge(value, 1, Integer::sum);
+					System.out.println("Paxos learner for instance " + instance + " : value " + value + " has " + votes + " fast accepts");
+					if (votes >= this.server_state.fastQuorum(ballot)) {
+						System.out.println("Paxos learner: waking up the main loop");
+						entry.decided_value = value;
+						entry.decided       = true;
+						this.server_state.main_loop.wakeup();
+					}
+				}
+			}
+			else if (ballot == entry.accept_ballot) {
+				entry.n_accepts++;
+				System.out.println("Paxos learner for instance " + instance + " : number of accepts " +  entry.n_accepts);
+				if (entry.n_accepts >= this.server_state.scheduler.quorum(ballot)) {
+					System.out.println("Paxos learner: waking up the main loop");
+					entry.decided = true;
+					this.server_state.main_loop.wakeup();
+				}
+			}
+			else if (ballot > entry.accept_ballot) {
+				System.out.println("Paxos learner for instance " + instance + " : resetting ");
+				entry.decided_value  = value;
+				entry.accept_ballot  = ballot;
+				entry.n_accepts      = 1;
+			}
+		}
+
+		DidaTradePaxos.LearnReply.Builder response_builder = DidaTradePaxos.LearnReply.newBuilder();
+		response_builder.setInstance(instance);
+		response_builder.setBallot(ballot);
+
+		DidaTradePaxos.LearnReply response = response_builder.build();
+
+		responseObserver.onNext(response);
+		responseObserver.onCompleted();
     }
-
 }

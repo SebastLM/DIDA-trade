@@ -114,6 +114,12 @@ public class DidaTradeServerState {
 		return this.last_prepared_ballot;
     }
 
+    
+    public int fastQuorum(int ballot) {
+		int n_acceptors = this.scheduler.acceptors(ballot).size();
+		return (3 * n_acceptors + 3) / 4;
+    }
+
     public synchronized int getCompletedBallot (int instance) {
 		return this.completed_ballot.get(instance);
     }
