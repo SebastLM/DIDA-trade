@@ -179,7 +179,7 @@ public class MainLoop implements Runnable  {
 		}
 
 		/*
-			!! Why waitUntilDone() and not waitForQuorum():
+			!! Why waitUntilDone() and not waitForQuorum(): fast paxos waitForrequires 3/2 * f + 1 quorums, so in our case, since we have 5 acceptors, we will need sized 4 quorums
 
 			We still only wait for a quorum PhaseOneProcessor.onNext() returns true as soon as a quorum 
 			has replier or as soon as one acceptor rejects.
