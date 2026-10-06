@@ -32,6 +32,17 @@ message PhaseTwoRequest {
   int32 value           = 3;
 }
 
+message PhaseTwoFastRequest {
+  int32 instance        = 1;
+  int32 requestballot   = 2;
+}
+
+message PhaseTwoFastReply {
+  bool  accepted        = 1;
+  int32 serverid        = 2;
+  int32 maxballot       = 3;
+}
+
 message PhaseTwoReply {
   int32 instance        = 1;
   int32 serverid        = 2;

@@ -100,7 +100,11 @@ public class MainLoop implements Runnable  {
 
 					if (this.server_state.scheduler.fastpaxos(this.server_state.getCurrentBallot())) {
 						// run fast paxos
-					} else {
+						while (this.server_state.getCurrentBallot() == ballot) {
+							this.processPhaseTwo(request.getId(), ballot, this.next_slot_to_dispatch);
+							this.next_slot_to_dispatch++;
+						}
+				} else {
 						// run multi-paxos
 						RequestRecord request = this.server_state.req_history.getFirstNotProposed();
 						while (request != null && this.server_state.getCurrentBallot() == ballot) {
@@ -205,6 +209,34 @@ public class MainLoop implements Runnable  {
 	}
 
 	// Returns true if the value was accepted by a quorum
+	void processAny(int ballot, int entry_number) {
+		System.out.println("Going to run fast paxos round, sending ANY to every acceptor");
+			
+		// TODO - Quorum needs to be a bigger one 
+		List<Integer> acceptors        = this.server_state.scheduler.acceptors(ballot);
+		int           quorum           = this.server_state.scheduler.quorum(ballot);
+		int           n_acceptors      = acceptors.size();
+
+		// send ANY
+		DidaTradePaxos.PhaseTwoFastRequest.Builder phase_two_fast_request = DidaTradePaxos.PhaseTwoFastRequest.newBuilder();
+		phase_two_fast_request.setInstance(entry_number);
+		phase_two_fast_request.setRequestballot(ballot);
+
+		PhaseTwoResponseProcessor phase_two_fast_processor = new PhaseTwoFastResponseProcessor(quorum);
+
+		System.out.println("Calling peers with phase_two_fast_request = " + phase_two_fast_request);
+		ArrayList<DidaTradePaxos.PhaseTwoReply> phase_two_fast_responses = new ArrayList<DidaTradePaxos.PhaseTwoFastReply>();
+		GenericResponseCollector<DidaTradePaxos.PhaseTwoFastReply> phase_two_fast_collector = new GenericResponseCollector<DidaTradePaxos.PhaseTwoFastReply>(phase_two_fast_responses, n_acceptors, phase_two_fast_processor, () -> this.onPhaseTwoDone(phase_two_processor, value, ballot, entry_number));
+
+		for (int i = 0; i < n_acceptors  ; i++) {
+			CollectorStreamObserver<DidaTradePaxos.PhaseTwoReply> phase_two_fast_observer = new CollectorStreamObserver<DidaTradePaxos.PhaseTwoReply>(phase_two__fast_collector);
+			this.server_state.async_stubs[acceptors.get(i)].phasetwo(phase_two_fast_request.build(), phase_two__fast_observer);
+		}
+		System.out.println("Waiting for responses...");
+		return;
+	}
+
+	// Returns true if the value was accepted by a quorum
 	void processPhaseTwo(int value, int ballot, int entry_number) {
 		try {
             window.acquire();
@@ -245,7 +277,7 @@ public class MainLoop implements Runnable  {
 		if (phase_two_processor.getAccepted() == false) {
 			this.server_state.setCurrentBallot(phase_two_processor.getMaxballot());
 			System.out.println("Paxos phase 2 ended with ballot_aborted for entry: " + entry_number + "ballot: " + ballot);
-			
+
 			RequestRecord request = this.server_state.req_history.getIfPending(value);
 			if (request != null) {
 				request.setProposed(false);
@@ -259,6 +291,24 @@ public class MainLoop implements Runnable  {
 				entry.decided = true;
 			}
 			window.release();
+			wakeup();
+			return;
+		}
+    }
+
+	private void onPhaseTwoFastDone(PhaseTwoResponseProcessor phase_two_fast_processor, int ballot, int entry_number) {
+		if (phase_two_fast_processor.getAccepted() == false) {
+			this.server_state.setCurrentBallot(phase_two_fast_processor.getMaxballot());
+			System.out.println("Fast Paxos phase 2 ended with ballot_aborted for entry: " + entry_number + "ballot: " + ballot);
+			return;
+		} else {
+            // Here the proposer would learn what value was decided and set decided = true.
+
+			// PaxosInstance entry = this.server_state.paxos_log.testAndSetEntry(entry_number);
+			// synchronized (entry) {
+			// 	entry.command_id = value;
+			// 	entry.decided = true;
+			// }
 			wakeup();
 			return;
 		}

@@ -81,6 +81,7 @@ public class GenericResponseCollector<T>  {
 		notifyAll();
     }
 
+
     public synchronized void waitForQuorum(int quorum) {
         while ((this.done == false) && (this.received < quorum)) {
             try {
