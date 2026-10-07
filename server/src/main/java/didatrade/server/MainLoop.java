@@ -303,6 +303,19 @@ public class MainLoop implements Runnable  {
 			return;
 		} else {
             // Here the proposer would learn what value was decided and set decided = true.
+			
+			List<Integer> learners = this.server_state.scheduler.learners(ballot);
+			int n_targets = learners.size();
+			DidaTradePaxos.LearnRequest.Builder learn_request_builder = DidaTradePaxos.LearnRequest.newBuilder();
+			learn_request_builder.setInstance(instance);
+			learn_request_builder.setValue(value);
+			learn_request_builder.setBallot(ballot);
+			DidaTradePaxos.LearnRequest learn_request = learn_request_builder.build();
+			System.out.println("Paxos acceptor: going to notify learners for entry " + instance + " with timestamp " + ballot + " request = " + learn_request);
+			ArrayList<DidaTradePaxos.LearnReply> learn_responses = new ArrayList<DidaTradePaxos.LearnReply>();
+			GenericResponseCollector<DidaTradePaxos.LearnReply> learn_collector = new GenericResponseCollector<DidaTradePaxos.LearnReply>(learn_responses, n_targets);
+			for (int i = 0; i < n_targets; i++) {
+				CollectorStreamObserver<DidaTradePaxos.LearnReply> learn_observer = new CollectorStreamObserver<DidaTradePaxos.LearnReply>(learn_collector);this.server_state.async_stubs[learners.get(i)].learn(learn_request, learn_observer);}
 
 			// PaxosInstance entry = this.server_state.paxos_log.testAndSetEntry(entry_number);
 			// synchronized (entry) {

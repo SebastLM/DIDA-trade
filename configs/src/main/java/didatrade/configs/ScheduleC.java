@@ -42,14 +42,14 @@ public class ScheduleC extends Schedule {
 	return this.all_participants;
     }
 
-    public boolean isacceptor (int node, int ballot) {
+    public boolean isacceptor(int node, int ballot) {
 	if (ballot < 2)
 	    return this.acceptors_start.contains(node);
 	else 
 	    return this.acceptors_end.contains(node);
     }
       
-    public Integer leader (int ballot) {
+    public Integer leader(int ballot) {
 	if (ballot < 2)
 	    return new Integer(ballot);
 	else if (ballot < 5)
@@ -58,7 +58,7 @@ public class ScheduleC extends Schedule {
 	    return new Integer(5);
     }
         
-    public Integer quorum (int ballot) {
+    public Integer quorum(int ballot) {
 	if (ballot < 2)
 	    return new Integer(2);
 	else 

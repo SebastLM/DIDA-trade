@@ -28,8 +28,8 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 
 		PaxosInstance entry   = this.server_state.paxos_log.testAndSetEntry(instance, ballot);
 
-		int  value            = entry.command_id;
-		int  valballot        = entry.write_ballot;
+		int value            = entry.command_id;
+		int valballot        = entry.write_ballot;
 
 		if (ballot >= this.server_state.getCurrentBallot()) {
 			accepted = true;
@@ -187,8 +187,9 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 				}
 
 				if (ballot == entry.accept_ballot) {
+					// verifys the amount of votes for the specific value and at the same time adds one
 					int votes = entry.fast_votes.merge(value, 1, Integer::sum);
-					System.out.println("Paxos learner for instance " + instance + " : value " + value + " has " + votes + " fast accepts");
+					System.out.println("Paxofs learner for instance " + instance + " : value " + value + " has " + votes + " fast accepts");
 					if (votes >= this.server_state.fastQuorum(ballot)) {
 						System.out.println("Paxos learner: waking up the main loop");
 						entry.decided_value = value;
@@ -205,8 +206,7 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 					entry.decided = true;
 					this.server_state.main_loop.wakeup();
 				}
-			}
-			else if (ballot > entry.accept_ballot) {
+			} else if (ballot > entry.accept_ballot) {
 				System.out.println("Paxos learner for instance " + instance + " : resetting ");
 				entry.decided_value  = value;
 				entry.accept_ballot  = ballot;

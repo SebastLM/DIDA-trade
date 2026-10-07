@@ -42,7 +42,7 @@ public class ScheduleB extends Schedule {
     }
 
     public Integer quorum(int ballot) {
-	return new Integer(4);
+return new Integer(3);
     }
 
     public boolean fastpaxos(int ballot) {
