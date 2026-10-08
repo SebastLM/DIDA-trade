@@ -179,13 +179,10 @@ public class DidaTradeServerState {
 		return this.completed_ballot.get(instance);
     }
 
-    public synchronized boolean getFastPaxosMode () {
-	return this.fastpaxos_on;
-    }
 
-    public synchronized void setFastPaxosMode (boolean mode) {
-	this.fastpaxos_on = mode;
-    }
+	public synchronized boolean inFastMode() {
+    	return this.fast_ballot == this.current_ballot;
+	}
 
 	public synchronized int getFastBallot () {
 	return this.fast_ballot;
@@ -201,6 +198,10 @@ public class DidaTradeServerState {
 
     public synchronized void setFastNextInstance (int instance) {
 	this.fast_next_instance = instance;
+    }
+
+	public synchronized int nextFastInstance() {
+		return this.fast_next_instance++;
     }
 
     public synchronized int getDebugMode () {
