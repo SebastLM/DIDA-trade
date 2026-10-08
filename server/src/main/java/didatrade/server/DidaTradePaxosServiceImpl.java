@@ -151,10 +151,13 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		if (ballot >= this.server_state.getCurrentBallot()) {
 			accepted = true;
 			this.server_state.setCurrentBallot(ballot);
-			//TODO: it needs to remember that from this instance onward it will be accept any value
+			this.server_state.setFastPaxosMode(true);
+			this.server_state.setFastBallot(ballot);
+			this.server_state.setFastNextInstance(instance);
 		}
-		else
+		else {
 			maxballot = this.server_state.getCurrentBallot();
+		}
 
 		DidaTradePaxos.PhaseTwoFastReply.Builder response_builder = DidaTradePaxos.PhaseTwoFastReply.newBuilder();
 		response_builder.setAccepted(accepted);

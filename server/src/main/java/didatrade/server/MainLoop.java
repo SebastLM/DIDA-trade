@@ -10,6 +10,7 @@ import didatrade.util.GenericResponseCollector;
 import didatrade.util.CollectorStreamObserver;
 import didatrade.util.PhaseOneProcessor;
 import didatrade.util.PhaseTwoResponseProcessor;
+import didatrade.util.PhaseTwoFastResponseProcessor;
 
 import didatrade.configs.ConfigurationScheduler;
 
@@ -30,6 +31,7 @@ public class MainLoop implements Runnable  {
     private DidaTradePaxosServiceGrpc.DidaTradePaxosServiceStub[] async_stubs;
 
 	private int next_slot_to_dispatch;
+	private int last_any_ballot;
     private final Semaphore window = new Semaphore(6); // window size 6
 
     public MainLoop(DidaTradeServerState state) {
@@ -37,6 +39,7 @@ public class MainLoop implements Runnable  {
 		this.has_work       = false;
 		this.next_log_entry = -1;
 		this.next_slot_to_dispatch = 0;
+		this.last_any_ballot = -1;
     }
 
     public void run() {
@@ -100,11 +103,11 @@ public class MainLoop implements Runnable  {
 
 					if (this.server_state.scheduler.fastpaxos(this.server_state.getCurrentBallot())) {
 						// run fast paxos
-						while (this.server_state.getCurrentBallot() == ballot) {
-							this.processPhaseTwo(request.getId(), ballot, this.next_slot_to_dispatch);
-							this.next_slot_to_dispatch++;
+						if (this.last_any_ballot < ballot) {
+							this.last_any_ballot = ballot;
+							this.processAny(ballot, this.next_slot_to_dispatch);
 						}
-				} else {
+					} else {
 						// run multi-paxos
 						RequestRecord request = this.server_state.req_history.getFirstNotProposed();
 						while (request != null && this.server_state.getCurrentBallot() == ballot) {
@@ -126,8 +129,8 @@ public class MainLoop implements Runnable  {
 			}
 
 			System.out.println("Log entry with number " + this.next_log_entry + " has been decided with command id = "+ next_entry.command_id);
-			if (next_entry.command_id != -1) {
-				this.execute_tx(next_entry.command_id);
+			if (next_entry.decided_value != -1) {
+				this.execute_tx(next_entry.decided_value);
 			}
 			this.recovered_values.remove(this.next_log_entry);
 		}
@@ -222,15 +225,15 @@ public class MainLoop implements Runnable  {
 		phase_two_fast_request.setInstance(entry_number);
 		phase_two_fast_request.setRequestballot(ballot);
 
-		PhaseTwoResponseProcessor phase_two_fast_processor = new PhaseTwoFastResponseProcessor(quorum);
+		PhaseTwoFastResponseProcessor phase_two_fast_processor = new PhaseTwoFastResponseProcessor(quorum);
 
 		System.out.println("Calling peers with phase_two_fast_request = " + phase_two_fast_request);
-		ArrayList<DidaTradePaxos.PhaseTwoReply> phase_two_fast_responses = new ArrayList<DidaTradePaxos.PhaseTwoFastReply>();
-		GenericResponseCollector<DidaTradePaxos.PhaseTwoFastReply> phase_two_fast_collector = new GenericResponseCollector<DidaTradePaxos.PhaseTwoFastReply>(phase_two_fast_responses, n_acceptors, phase_two_fast_processor, () -> this.onPhaseTwoDone(phase_two_processor, value, ballot, entry_number));
+		ArrayList<DidaTradePaxos.PhaseTwoFastReply> phase_two_fast_responses = new ArrayList<DidaTradePaxos.PhaseTwoFastReply>();
+		GenericResponseCollector<DidaTradePaxos.PhaseTwoFastReply> phase_two_fast_collector = new GenericResponseCollector<DidaTradePaxos.PhaseTwoFastReply>(phase_two_fast_responses, n_acceptors, phase_two_fast_processor, () -> this.onPhaseTwoFastDone(phase_two_fast_processor, ballot, entry_number));
 
 		for (int i = 0; i < n_acceptors  ; i++) {
-			CollectorStreamObserver<DidaTradePaxos.PhaseTwoReply> phase_two_fast_observer = new CollectorStreamObserver<DidaTradePaxos.PhaseTwoReply>(phase_two__fast_collector);
-			this.server_state.async_stubs[acceptors.get(i)].phasetwo(phase_two_fast_request.build(), phase_two__fast_observer);
+			CollectorStreamObserver<DidaTradePaxos.PhaseTwoFastReply> phase_two_fast_observer = new CollectorStreamObserver<DidaTradePaxos.PhaseTwoFastReply>(phase_two_fast_collector);
+			this.server_state.async_stubs[acceptors.get(i)].phaseany(phase_two_fast_request.build(), phase_two_fast_observer);
 		}
 		System.out.println("Waiting for responses...");
 		return;
@@ -288,6 +291,7 @@ public class MainLoop implements Runnable  {
 			PaxosInstance entry = this.server_state.paxos_log.testAndSetEntry(entry_number);
 			synchronized (entry) {
 				entry.command_id = value;
+				entry.decided_value = value;
 				entry.decided = true;
 			}
 			window.release();

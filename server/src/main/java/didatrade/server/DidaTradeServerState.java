@@ -36,6 +36,9 @@ public class DidaTradeServerState {
 
     private int                 debug_mode;
     private boolean             fastpaxos_on;
+	private int                 fast_ballot;
+    private int                 fast_next_instance;
+
 
     MainLoop                    main_loop;
     Thread                      main_loop_worker;
@@ -57,7 +60,11 @@ public class DidaTradeServerState {
 	this.base_port        	  = port;
 	this.my_id            	  = myself;
 	this.debug_mode       	  = 0;
+
 	this.fastpaxos_on     	  = false;
+	this.fast_ballot          = -1;
+	this.fast_next_instance   = 0;
+
 	this.current_ballot   	  = 0;
 	this.completed_ballot 	  = new ArrayList<>();
 	this.req_history      	  = new RequestHistory();
@@ -178,6 +185,22 @@ public class DidaTradeServerState {
 
     public synchronized void setFastPaxosMode (boolean mode) {
 	this.fastpaxos_on = mode;
+    }
+
+	public synchronized int getFastBallot () {
+	return this.fast_ballot;
+    }
+
+    public synchronized void setFastBallot (int ballot) {
+	this.fast_ballot = ballot;
+    }
+
+    public synchronized int getFastNextInstance () {
+	return this.fast_next_instance;
+    }
+
+    public synchronized void setFastNextInstance (int instance) {
+	this.fast_next_instance = instance;
     }
 
     public synchronized int getDebugMode () {
