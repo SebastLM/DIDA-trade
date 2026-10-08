@@ -151,9 +151,9 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		if (ballot >= this.server_state.getCurrentBallot()) {
 			accepted = true;
 			this.server_state.setCurrentBallot(ballot);
-			this.server_state.setFastPaxosMode(true);
 			this.server_state.setFastBallot(ballot);
 			this.server_state.setFastNextInstance(instance);
+			this.server_state.main_loop.wakeup();
 		}
 		else {
 			maxballot = this.server_state.getCurrentBallot();

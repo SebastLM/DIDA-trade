@@ -63,8 +63,8 @@ public class MainLoop implements Runnable  {
 				earlier instances to be accepted. Several instances are in flight at once.
 
 				The result is handled by the gRPC thread that delivers the last reply needed:
-					it calls onPhaseTwoDone(), which marks the instance decided
-					(or raises the ballot on rejection) and wakes run().
+				(or raises the ballot on rejection) and wakes run().
+				it calls onPhaseTwoDone(), which marks the instance decided
 		*/
 		while (true) {
 
@@ -121,10 +121,10 @@ public class MainLoop implements Runnable  {
 					}
 				}
 
+				this.fastAcceptPending();
 				if (next_entry.decided == false) {
 					System.out.println("Entry not decided: waiting");
 					this.waitForWork();
-
 				}
 			}
 
@@ -136,12 +136,55 @@ public class MainLoop implements Runnable  {
 		}
 	}
 
+	private void fastAcceptPending() {
+		while (this.server_state.inFastMode()) {
+			RequestRecord request = this.server_state.req_history.getFirstNotProposed();
+            if (request == null)
+                return;
+            request.setProposed(true);
+
+			int ballot = this.server_state.getFastBallot();
+			int slot;
+
+			PaxosInstance entry;
+			while (true) {
+					slot  = this.server_state.nextFastInstance();
+					entry = this.server_state.paxos_log.testAndSetEntry(slot);
+					synchronized (entry) {
+							if (entry.write_ballot != ballot && !entry.decided) {
+									entry.command_id   = request.getId();
+									entry.write_ballot = ballot;
+									break;
+							}
+					}
+			}
+			System.out.println("Fast accept: request " + request.getId() + " in slot " + slot + " ballot " + ballot);
+			this.sendLearn(slot, ballot, request.getId());
+		}
+	}
+
+	private void sendLearn(int instance, int ballot, int value) {
+			List<Integer> learners = this.server_state.scheduler.learners(ballot);
+			int n_targets          = learners.size();
+
+			DidaTradePaxos.LearnRequest learn_request = DidaTradePaxos.LearnRequest.newBuilder()
+					.setInstance(instance)
+					.setBallot(ballot)
+					.setValue(value)
+					.build();
+
+			ArrayList<DidaTradePaxos.LearnReply> learn_responses = new ArrayList<DidaTradePaxos.LearnReply>();
+			GenericResponseCollector<DidaTradePaxos.LearnReply> learn_collector = new GenericResponseCollector<DidaTradePaxos.LearnReply>(learn_responses, n_targets);
+			for (int i = 0; i < n_targets; i++) {
+					CollectorStreamObserver<DidaTradePaxos.LearnReply> learn_observer = new CollectorStreamObserver<DidaTradePaxos.LearnReply>(learn_collector);
+					this.server_state.async_stubs[learners.get(i)].learn(learn_request, learn_observer);
+			}
+	}
 
 	public synchronized void wakeup() {
 		this.has_work = true;
 		notify();
 	}
-	
 
 	private synchronized void waitForWork() {
 		while (this.has_work == false) {
@@ -300,33 +343,14 @@ public class MainLoop implements Runnable  {
 		}
     }
 
-	private void onPhaseTwoFastDone(PhaseTwoResponseProcessor phase_two_fast_processor, int ballot, int entry_number) {
+	private void onPhaseTwoFastDone(PhaseTwoFastResponseProcessor phase_two_fast_processor, int ballot, int entry_number) {
 		if (phase_two_fast_processor.getAccepted() == false) {
 			this.server_state.setCurrentBallot(phase_two_fast_processor.getMaxballot());
 			System.out.println("Fast Paxos phase 2 ended with ballot_aborted for entry: " + entry_number + "ballot: " + ballot);
 			return;
 		} else {
-            // Here the proposer would learn what value was decided and set decided = true.
-			
-			List<Integer> learners = this.server_state.scheduler.learners(ballot);
-			int n_targets = learners.size();
-			DidaTradePaxos.LearnRequest.Builder learn_request_builder = DidaTradePaxos.LearnRequest.newBuilder();
-			learn_request_builder.setInstance(instance);
-			learn_request_builder.setValue(value);
-			learn_request_builder.setBallot(ballot);
-			DidaTradePaxos.LearnRequest learn_request = learn_request_builder.build();
-			System.out.println("Paxos acceptor: going to notify learners for entry " + instance + " with timestamp " + ballot + " request = " + learn_request);
-			ArrayList<DidaTradePaxos.LearnReply> learn_responses = new ArrayList<DidaTradePaxos.LearnReply>();
-			GenericResponseCollector<DidaTradePaxos.LearnReply> learn_collector = new GenericResponseCollector<DidaTradePaxos.LearnReply>(learn_responses, n_targets);
-			for (int i = 0; i < n_targets; i++) {
-				CollectorStreamObserver<DidaTradePaxos.LearnReply> learn_observer = new CollectorStreamObserver<DidaTradePaxos.LearnReply>(learn_collector);this.server_state.async_stubs[learners.get(i)].learn(learn_request, learn_observer);}
-
-			// PaxosInstance entry = this.server_state.paxos_log.testAndSetEntry(entry_number);
-			// synchronized (entry) {
-			// 	entry.command_id = value;
-			// 	entry.decided = true;
-			// }
 			wakeup();
+      		System.out.println("Fast Paxos ANY accepted for ballot " + ballot + " from entry " + entry_number);
 			return;
 		}
     }
