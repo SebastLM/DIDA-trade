@@ -187,17 +187,45 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 				if (ballot > entry.accept_ballot) {
 					entry.accept_ballot = ballot;
 					entry.fast_votes.clear();
+					entry.n_accepts = 0;
+					entry.fmv_num = 0;
+					entry.fmv_value = -1;
 				}
 
 				if (ballot == entry.accept_ballot) {
 					// verifys the amount of votes for the specific value and at the same time adds one
+					entry.n_accepts++;
 					int votes = entry.fast_votes.merge(value, 1, Integer::sum);
 					System.out.println("Paxofs learner for instance " + instance + " : value " + value + " has " + votes + " fast accepts");
-					if (votes >= this.server_state.fastQuorum(ballot)) {
+					
+					if (value != entry.fmv_value) {
+						if (entry.fmv_num < votes ) {
+							entry.fmv_num   = votes;
+							entry.fmv_value =  value;
+						}
+					} else {
+						entry.fmv_num++;
+					}
+					/*
+					if (value != entry.fmv_value) {
+						if (entry.fast_votes.get(value) > entry.fast_votes.get(entry.fmv_value) {
+							entry.fmv_value = value;
+						}
+					}
+					*/
+					int n = this.server_state.scheduler.acceptors(ballot).size();
+					int fq = this.server_state.fastQuorum(ballot); 
+					if ( fq > (entry.fmv_num + n - entry.n_accepts)) {
+						int next_ballot = ballot + 1;
+						if (this.server_state.scheduler.leader(next_ballot) == this.server_state.my_id) {
+							this.server_state.setCurrentBallot(next_ballot);
+							this.server_state.main_loop.wakeup();
+						}
+					} else if (votes >= this.server_state.fastQuorum(ballot)) {
 						System.out.println("Paxos learner: waking up the main loop");
 						entry.decided_value = value;
 						entry.decided       = true;
-						this.server_state.main_loop.wakeup();
+						// this.server_state.main_loop.wakeup();
 					}
 				}
 			}
