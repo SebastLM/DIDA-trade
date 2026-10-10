@@ -15,8 +15,8 @@ public class PaxosInstance {
 
     int decided_value;
     Map<Integer, Integer> fast_votes;
-    int fmv_value; // fmv = fast most voted
-    int fmv_num;
+    int leading_fast_value; // value with the most fast votes in accept_ballot
+    int leading_fast_votes; // number of fast votes for leading_fast_value
     
 
     public PaxosInstance() {
@@ -30,7 +30,7 @@ public class PaxosInstance {
         this.value_is_locked = false;
         this.decided_value   = 0;
         this.fast_votes      = new HashMap<>();
-        this.fmv_num         = 0;
+        this.leading_fast_votes = 0;
     }
 
     
@@ -45,7 +45,7 @@ public class PaxosInstance {
         this.value_is_locked = false;
         this.decided_value   = 0;
         this.fast_votes      = new HashMap<>();
-        this.fmv_num         = 0;
+        this.leading_fast_votes = 0;
     }
 
     public PaxosInstance(int id, int ballot) {
@@ -59,6 +59,6 @@ public class PaxosInstance {
         this.value_is_locked = false;
         this.decided_value   = 0;
         this.fast_votes      = new HashMap<>();
-        this.fmv_num         = 0;
+        this.leading_fast_votes = 0;
     }
 }

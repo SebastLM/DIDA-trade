@@ -31,12 +31,18 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		int value            = entry.command_id;
 		int valballot        = entry.write_ballot;
 
-		if (ballot >= this.server_state.getCurrentBallot()) {
-			accepted = true;
-			this.server_state.setCurrentBallot(ballot);
-		}
+		int maxballot;
+		List<PaxosInstance> entries;
 
-		int maxballot = this.server_state.getCurrentBallot();
+		synchronized (this.server_state) {
+				if (ballot >= this.server_state.getCurrentBallot()) {
+						accepted = true;
+						this.server_state.setCurrentBallot(ballot);
+				}
+
+				maxballot = this.server_state.getCurrentBallot();
+				entries   = this.server_state.paxos_log.entriesFrom(instance);
+		}
 
 		DidaTradePaxos.PhaseOneReply.Builder response_builder = DidaTradePaxos.PhaseOneReply.newBuilder();
 		response_builder.setServerid(this.server_state.my_id);
@@ -55,7 +61,6 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 			NOTE: IMPLEMENTATION DETAIL; We dont send entries that were not accepted, even if there is some instance before that that is decided
 			We expect the proposer to be smart and note that if we dont send instace X and send X+1 is because X is not accepted.
 		*/
-		List<PaxosInstance> entries = this.server_state.paxos_log.entriesFrom(instance);
 		for (PaxosInstance e : entries) {
 			if (e.write_ballot > -1) {
 				DidaTradePaxos.LogEntry.Builder log_entry_builder = DidaTradePaxos.LogEntry.newBuilder();
@@ -85,17 +90,19 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		boolean first_accept  = false;
 		int  maxballot        = ballot;
 
-		synchronized (entry) {
-			if (ballot >= this.server_state.getCurrentBallot()) {
-				accepted           = true;
-				// dont notify the learners twice
-				first_accept       = (entry.write_ballot != ballot);
-				entry.command_id   = value;
-				entry.write_ballot = ballot;
-				this.server_state.setCurrentBallot(ballot);
+        synchronized (this.server_state) {
+			synchronized (entry) {
+				if (ballot >= this.server_state.getCurrentBallot()) {
+					accepted           = true;
+					// dont notify the learners twice
+					first_accept       = (entry.write_ballot != ballot);
+					entry.command_id   = value;
+					entry.write_ballot = ballot;
+					this.server_state.setCurrentBallot(ballot);
+				}
+				else
+					maxballot = this.server_state.getCurrentBallot();
 			}
-			else
-				maxballot = this.server_state.getCurrentBallot();
 		}
 
 		DidaTradePaxos.PhaseTwoReply.Builder response_builder = DidaTradePaxos.PhaseTwoReply.newBuilder();
@@ -148,15 +155,17 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 		boolean accepted      = false;
 		int  maxballot        = ballot;
 
-		if (ballot >= this.server_state.getCurrentBallot()) {
-			accepted = true;
-			this.server_state.setCurrentBallot(ballot);
-			this.server_state.setFastBallot(ballot);
-			this.server_state.setFastNextInstance(instance);
-			this.server_state.main_loop.wakeup();
-		}
-		else {
-			maxballot = this.server_state.getCurrentBallot();
+		synchronized (this.server_state) {
+			if (ballot >= this.server_state.getCurrentBallot()) {
+				accepted = true;
+				this.server_state.setCurrentBallot(ballot);
+				this.server_state.setFastBallot(ballot);
+				this.server_state.setFastNextInstance(instance);
+				this.server_state.main_loop.wakeup();
+			}
+			else {
+				maxballot = this.server_state.getCurrentBallot();
+			}
 		}
 
 		DidaTradePaxos.PhaseTwoFastReply.Builder response_builder = DidaTradePaxos.PhaseTwoFastReply.newBuilder();
@@ -188,44 +197,38 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 					entry.accept_ballot = ballot;
 					entry.fast_votes.clear();
 					entry.n_accepts = 0;
-					entry.fmv_num = 0;
-					entry.fmv_value = -1;
+					entry.leading_fast_votes = 0;
+					entry.leading_fast_value = -1;
 				}
 
 				if (ballot == entry.accept_ballot) {
-					// verifys the amount of votes for the specific value and at the same time adds one
+
 					entry.n_accepts++;
 					int votes = entry.fast_votes.merge(value, 1, Integer::sum);
-					System.out.println("Paxofs learner for instance " + instance + " : value " + value + " has " + votes + " fast accepts");
-					
-					if (value != entry.fmv_value) {
-						if (entry.fmv_num < votes ) {
-							entry.fmv_num   = votes;
-							entry.fmv_value =  value;
+					System.out.println("Paxos learner for instance " + instance + " : value " + value + " has " + votes + " fast accepts");
+
+					if (value != entry.leading_fast_value) {
+						if (entry.leading_fast_votes < votes ) {
+							entry.leading_fast_votes = votes;
+							entry.leading_fast_value = value;
 						}
 					} else {
-						entry.fmv_num++;
+						entry.leading_fast_votes++;
 					}
-					/*
-					if (value != entry.fmv_value) {
-						if (entry.fast_votes.get(value) > entry.fast_votes.get(entry.fmv_value) {
-							entry.fmv_value = value;
-						}
-					}
-					*/
-					int n = this.server_state.scheduler.acceptors(ballot).size();
-					int fq = this.server_state.fastQuorum(ballot); 
-					if ( fq > (entry.fmv_num + n - entry.n_accepts)) {
+
+					int n_acceptors = this.server_state.scheduler.acceptors(ballot).size();
+					int fast_quorum = this.server_state.fastQuorum(ballot);
+					if (fast_quorum > (entry.leading_fast_votes + n_acceptors - entry.n_accepts)) {
 						int next_ballot = ballot + 1;
 						if (this.server_state.scheduler.leader(next_ballot) == this.server_state.my_id) {
 							this.server_state.setCurrentBallot(next_ballot);
 							this.server_state.main_loop.wakeup();
 						}
-					} else if (votes >= this.server_state.fastQuorum(ballot)) {
+					} else if (votes >= fast_quorum) {
 						System.out.println("Paxos learner: waking up the main loop");
 						entry.decided_value = value;
 						entry.decided       = true;
-						// this.server_state.main_loop.wakeup();
+						this.server_state.main_loop.wakeup();
 					}
 				}
 			}

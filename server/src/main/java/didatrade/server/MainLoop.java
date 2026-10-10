@@ -139,25 +139,35 @@ public class MainLoop implements Runnable  {
 	private void fastAcceptPending() {
 		while (this.server_state.inFastMode()) {
 			RequestRecord request = this.server_state.req_history.getFirstNotProposed();
-            if (request == null)
-                return;
-            request.setProposed(true);
+			if (request == null)
+				return;
+			request.setProposed(true);
 
-			int ballot = this.server_state.getFastBallot();
+			int ballot;
 			int slot;
 
-			PaxosInstance entry;
-			while (true) {
+			synchronized (this.server_state) {
+				if (!this.server_state.inFastMode()) {
+					request.setProposed(false);
+					return;
+				}
+				ballot = this.server_state.getFastBallot();
+
+				PaxosInstance entry;
+				while (true) {
 					slot  = this.server_state.nextFastInstance();
 					entry = this.server_state.paxos_log.testAndSetEntry(slot);
+
 					synchronized (entry) {
-							if (entry.write_ballot != ballot && !entry.decided) {
-									entry.command_id   = request.getId();
-									entry.write_ballot = ballot;
-									break;
-							}
+						if (entry.write_ballot != ballot && !entry.decided) {
+							entry.command_id   = request.getId();
+							entry.write_ballot = ballot;
+							break;
+						}
 					}
+				}
 			}
+
 			System.out.println("Fast accept: request " + request.getId() + " in slot " + slot + " ballot " + ballot);
 			this.sendLearn(slot, ballot, request.getId());
 		}
