@@ -181,6 +181,7 @@ public class MainLoop implements Runnable  {
 					.setInstance(instance)
 					.setBallot(ballot)
 					.setValue(value)
+					.setFast(true)
 					.build();
 
 			ArrayList<DidaTradePaxos.LearnReply> learn_responses = new ArrayList<DidaTradePaxos.LearnReply>();
@@ -339,6 +340,9 @@ public class MainLoop implements Runnable  {
 				request.setProposed(false);
 			}
 			window.release();
+			if (phase_two_processor.getMaxballot() > ballot) {
+				wakeup();
+			}
 			return;
 		} else {
 			PaxosInstance entry = this.server_state.paxos_log.testAndSetEntry(entry_number);
@@ -357,6 +361,9 @@ public class MainLoop implements Runnable  {
 		if (phase_two_fast_processor.getAccepted() == false) {
 			this.server_state.setCurrentBallot(phase_two_fast_processor.getMaxballot());
 			System.out.println("Fast Paxos phase 2 ended with ballot_aborted for entry: " + entry_number + "ballot: " + ballot);
+			if (phase_two_fast_processor.getMaxballot() > ballot) {
+				wakeup();
+			}
 			return;
 		} else {
 			wakeup();

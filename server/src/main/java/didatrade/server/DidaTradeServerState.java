@@ -71,7 +71,7 @@ public class DidaTradeServerState {
 	this.paxos_log        	  = new PaxosLog();
 	this.main_loop        	  = new MainLoop(this);
 	this.debug 				  = debug;
-	this.last_prepared_ballot = 0;
+	this.last_prepared_ballot = -1;
 
 	// populate manager
 	this.trade_manager.populate(DEFAULT_POPULATION);

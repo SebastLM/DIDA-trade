@@ -192,7 +192,7 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 
 			this.server_state.setCurrentBallot(ballot);
 
-			if (this.server_state.scheduler.fastpaxos(ballot)) {
+			if (this.server_state.scheduler.fastpaxos(ballot) && request.getFast()) {
 				if (ballot > entry.accept_ballot) {
 					entry.accept_ballot = ballot;
 					entry.fast_votes.clear();

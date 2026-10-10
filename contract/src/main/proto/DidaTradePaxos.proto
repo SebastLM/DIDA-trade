@@ -55,6 +55,7 @@ message LearnRequest {
   int32 instance   = 1;
   int32 ballot     = 2;
   int32 value      = 3;
+  bool  fast       = 4;
 }
 
 message LearnReply {
