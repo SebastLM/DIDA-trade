@@ -39,6 +39,9 @@ public class DidaTradeServerState {
 	private int                 fast_ballot;
     private int                 fast_next_instance;
 
+	final Object execution_lock = new Object();
+	private int                 last_instance = -1;
+
 
     MainLoop                    main_loop;
     Thread                      main_loop_worker;
@@ -202,6 +205,21 @@ public class DidaTradeServerState {
 
 	public synchronized int nextFastInstance() {
 		return this.fast_next_instance++;
+    }
+
+	public synchronized int getLastInstance() {
+	return this.last_instance;
+    }
+
+    public synchronized void setLastInstance(int instance) {
+	this.last_instance = instance;
+	this.notifyAll();
+    }
+
+    public synchronized void waitForInstance(int instance) {
+	while (this.last_instance < instance) {
+	    try { wait(); } catch (InterruptedException e) {}
+	}
     }
 
     public synchronized int getDebugMode () {

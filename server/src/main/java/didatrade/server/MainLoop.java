@@ -129,9 +129,14 @@ public class MainLoop implements Runnable  {
 			}
 
 			System.out.println("Log entry with number " + this.next_log_entry + " has been decided with command id = "+ next_entry.command_id);
-			if (next_entry.decided_value != -1) {
-				this.execute_tx(next_entry.decided_value);
+			
+			synchronized (this.server_state.execution_lock) {
+				this.server_state.setLastInstance(this.next_log_entry);
+				if (next_entry.decided_value != -1) {
+					this.execute_tx(next_entry.decided_value);
+				}
 			}
+
 			this.recovered_values.remove(this.next_log_entry);
 		}
 	}
