@@ -35,6 +35,12 @@ public class RequestHistory {
         }
         return null;
     }
+
+    public synchronized void resetProposed() {
+        for (RequestRecord record : this.pending.values()) {
+            record.setProposed(false);
+        }
+    }
    
     public synchronized RequestRecord getIfProcessed(int requestid) {
 	Integer id = new Integer(requestid);

@@ -82,6 +82,7 @@ public class MainLoop implements Runnable  {
 				if ((this.server_state.scheduler.leader(ballot) == this.server_state.my_id) && this.server_state.getLastPreparedBallot() < ballot) {
 					Map<Integer, Integer> phase_two_values = this.processPhaseOne(this.next_log_entry, ballot);
 					if (phase_two_values != null) {
+						this.server_state.req_history.resetProposed();
 						this.recovered_values = phase_two_values;
 						this.next_slot_to_dispatch = this.next_log_entry;
 
