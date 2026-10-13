@@ -355,7 +355,7 @@ public class MainLoop implements Runnable  {
 			synchronized (entry) {
 				entry.command_id = value;
 				entry.decided_value = value;
-				entry.decided = true;
+				entry.decided = true;	
 			}
 			window.release();
 			wakeup();
@@ -387,7 +387,7 @@ public class MainLoop implements Runnable  {
 
 			Multipaxos "allows" this to happen, was explain in classes that either the app should address it or 
 			the consesus implementation address it, we decided to address it.
-			*/
+			*/ 
 			if (this.server_state.req_history.getIfProcessed(command_id) != null) {
 				System.out.println("This command: " + command_id + " was already executed.");
 				return false;
@@ -441,4 +441,54 @@ public class MainLoop implements Runnable  {
 			this.server_state.req_history.moveToProcessed(record.getId());
 			return true;
 		}
+
+
+	public void recover(int instance) { // instance = first instance needed
+		DidaTradePaxos.StateTransferRequest stateTransferRequest = DidaTradePaxos.StateTransferRequest.newBuilder()
+				.setInstance(instance)
+				.build();
+
+		List<Integer> learners = this.server_state.scheduler.learners(this.server_state.getCurrentBallot());
+		int n_targets = learners.size() - 1; // removing this node from counting (all nodes are learners)
+		
+		ArrayList<DidaTradePaxos.StateTransferReply> stateTransferResponses = new ArrayList<DidaTradePaxos.StateTransferReply>();
+		GenericResponseCollector<DidaTradePaxos.StateTransferReply> stateTransferResp_collector = new GenericResponseCollector<DidaTradePaxos.StateTransferReply>(stateTransferResponses, n_targets);
+
+		for (int id : learners) {
+			if (id == this.server_state.my_id) continue;
+			CollectorStreamObserver<DidaTradePaxos.StateTransferReply> observer = new CollectorStreamObserver<>(stateTransferResp_collector);
+			this.server_state.async_stubs[id].stateTransfer(stateTransferRequest, observer);
+		}
+		stateTransferResp_collector.waitUntilDone();
+
+		DidaTradePaxos.StateTransferReply best = null; // find the largest response (as it already contains all others)
+		for (DidaTradePaxos.StateTransferReply stateTransferReply : stateTransferResponses) {
+			if (best == null || stateTransferReply.getRecoverCount() > best.getRecoverCount())
+				best = stateTransferReply;
+		}
+		if (best == null || best.getRecoverCount() == 0) {
+			return;
+		}
+		
+		for (int i = 0; i < best.getRecoverCount(); i++) {
+			DidaTradePaxos.PerInstance instance_x = best.getRecover(i);
+			int entry_number = instance + i;
+
+			// add the record to the pending in req_history (if it isn't already there)
+			if (instance_x.getReqid() != -1 && this.server_state.req_history.getIfExists(instance_x.getReqid()) == null) {
+				DidaTradeAction action = DidaTradeAction.valueOf(instance_x.getAction().name());
+				DidaTradeCommand command = new DidaTradeCommand(action, instance_x.getUserid(), instance_x.getQuantity(), instance_x.getStock());
+				RequestRecord record = new RequestRecord(instance_x.getReqid(), command);
+				record.setProposed(true);
+				
+				this.server_state.req_history.addToPending(instance_x.getReqid(), record);
+			}
+
+			// add the instance to the log
+			PaxosInstance p_instance = this.server_state.paxos_log.testAndSetEntry(entry_number);
+			p_instance.decided_value = instance_x.getReqid();
+			p_instance.decided = true;
+		}
+		this.wakeup();
+	}
 }
