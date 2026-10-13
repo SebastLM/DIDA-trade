@@ -161,7 +161,7 @@ public class DidaTradePaxosServiceImpl extends DidaTradePaxosServiceGrpc.DidaTra
 				this.server_state.setCurrentBallot(ballot);
 				this.server_state.setFastBallot(ballot);
 				this.server_state.setFastNextInstance(instance);
-				this.server_state.req_history.resetProposed();
+				this.server_state.req_history.resetFastVoted();
 				this.server_state.main_loop.wakeup();
 			}
 			else {

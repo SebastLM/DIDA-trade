@@ -2,21 +2,14 @@ package didatrade.server;
 
 import java.util.*;
 import java.util.concurrent.*;
-import didatrade.DidaTradeMain;
 import didatrade.DidaTradePaxos;
 import didatrade.DidaTradePaxosServiceGrpc;
-
 import didatrade.util.GenericResponseCollector;
 import didatrade.util.CollectorStreamObserver;
 import didatrade.util.PhaseOneProcessor;
 import didatrade.util.PhaseTwoResponseProcessor;
 import didatrade.util.PhaseTwoFastResponseProcessor;
-
-import didatrade.configs.ConfigurationScheduler;
-
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
-
 
 public class MainLoop implements Runnable  {
     DidaTradeServerState server_state;
@@ -82,7 +75,9 @@ public class MainLoop implements Runnable  {
 				if ((this.server_state.scheduler.leader(ballot) == this.server_state.my_id) && this.server_state.getLastPreparedBallot() < ballot) {
 					Map<Integer, Integer> phase_two_values = this.processPhaseOne(this.next_log_entry, ballot);
 					if (phase_two_values != null) {
+
 						this.server_state.req_history.resetProposed();
+
 						this.recovered_values = phase_two_values;
 						this.next_slot_to_dispatch = this.next_log_entry;
 
@@ -112,7 +107,9 @@ public class MainLoop implements Runnable  {
 						// run multi-paxos
 						RequestRecord request = this.server_state.req_history.getFirstNotProposed();
 						while (request != null && this.server_state.getCurrentBallot() == ballot) {
+
 							request.setProposed(true);
+
 							if (!this.recovered_values.containsValue(request.getId())) {
 								this.processPhaseTwo(request.getId(), ballot, this.next_slot_to_dispatch);
 								this.next_slot_to_dispatch++;
@@ -130,7 +127,7 @@ public class MainLoop implements Runnable  {
 			}
 
 			System.out.println("Log entry with number " + this.next_log_entry + " has been decided with command id = "+ next_entry.command_id);
-			
+
 			synchronized (this.server_state.execution_lock) {
 				this.server_state.setLastInstance(this.next_log_entry);
 				if (next_entry.decided_value != -1) {
@@ -144,17 +141,17 @@ public class MainLoop implements Runnable  {
 
 	private void fastAcceptPending() {
 		while (this.server_state.inFastMode()) {
-			RequestRecord request = this.server_state.req_history.getFirstNotProposed();
+			RequestRecord request = this.server_state.req_history.getFirstNotFastVoted();
 			if (request == null)
 				return;
-			request.setProposed(true);
+			request.setFastVoted(true);
 
 			int ballot;
 			int slot;
 
 			synchronized (this.server_state) {
 				if (!this.server_state.inFastMode()) {
-					request.setProposed(false);
+					request.setFastVoted(false);
 					return;
 				}
 				ballot = this.server_state.getFastBallot();
@@ -274,7 +271,7 @@ public class MainLoop implements Runnable  {
 	// Returns true if the value was accepted by a quorum
 	void processAny(int ballot, int entry_number) {
 		System.out.println("Going to run fast paxos round, sending ANY to every acceptor");
-			
+
 		// TODO - Quorum needs to be a bigger one 
 		List<Integer> acceptors        = this.server_state.scheduler.acceptors(ballot);
 		int           quorum           = this.server_state.scheduler.quorum(ballot);
@@ -441,7 +438,6 @@ public class MainLoop implements Runnable  {
 			this.server_state.req_history.moveToProcessed(record.getId());
 			return true;
 		}
-
 
 	public void recover(int instance) { // instance = first instance needed
 		DidaTradePaxos.StateTransferRequest stateTransferRequest = DidaTradePaxos.StateTransferRequest.newBuilder()

@@ -36,17 +36,33 @@ public class RequestHistory {
         return null;
     }
 
+    public synchronized RequestRecord getFirstNotFastVoted() {
+        Enumeration<Integer> pendingids = this.pending.keys();
+        while (pendingids.hasMoreElements()) {
+            RequestRecord record = this.pending.get(pendingids.nextElement());
+            if (!record.isFastVoted())
+                return record;
+        }
+        return null;
+    }
+
+    public synchronized void resetFastVoted() {
+        for (RequestRecord record : this.pending.values()) {
+            record.setFastVoted(false);
+        }
+    }
+
     public synchronized void resetProposed() {
         for (RequestRecord record : this.pending.values()) {
             record.setProposed(false);
         }
     }
-   
+
     public synchronized RequestRecord getIfProcessed(int requestid) {
 	Integer id = new Integer(requestid);
         return this.processed.get(id);
     }
-   
+
     public synchronized RequestRecord getIfExists(int requestid) {
         RequestRecord record;
 	Integer id = new Integer(requestid);
@@ -56,10 +72,10 @@ public class RequestHistory {
 	    record = this.processed.get(id);
 	return record;
     }
-   
+
     public synchronized void addToPending(int requestid, RequestRecord record) {
 	Integer id = new Integer(requestid);
-	
+
 	this.pending.put (id, record);
     }
 
