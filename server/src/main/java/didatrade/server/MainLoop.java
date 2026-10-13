@@ -34,8 +34,75 @@ public class MainLoop implements Runnable  {
 		this.last_any_ballot = -1;
     }
 
+	private void recoverAsNewLeader(int ballot) {
+		if (this.isLeader(ballot) && this.server_state.getLastPreparedBallot() < ballot) {
+
+			Map<Integer, Integer> phase_two_values = this.processPhaseOne(this.next_log_entry, ballot);
+				if (phase_two_values != null) {
+
+					this.server_state.req_history.resetProposed();
+
+					this.recovered_values = phase_two_values;
+					this.next_slot_to_dispatch = this.next_log_entry;
+
+					int number_of_recovered_values = phase_two_values.size();
+					for (int slot = this.next_log_entry; number_of_recovered_values  > 0; slot++) {
+						Integer value = phase_two_values.get(slot);
+						if (value == null) {
+							value = -1;
+						} else {
+							number_of_recovered_values --;
+						}
+
+						this.processPhaseTwo(value, ballot, slot);
+						this.next_slot_to_dispatch = Math.max(this.next_slot_to_dispatch, slot + 1);
+					}
+				}
+			}
+	}
+
+	private void startFastRound(int ballot) {
+		// Dont start a FR if you are already in a fast round.
+		if (this.last_any_ballot < ballot) {
+			this.last_any_ballot = ballot;
+			this.processAny(ballot, this.next_slot_to_dispatch);
+		}
+	}
+
+	private boolean isLeader(int ballot) {
+		return this.server_state.scheduler.leader(ballot) == this.server_state.my_id;
+	}
+
+	private void proposePending(int ballot) {
+		RequestRecord request_record = this.server_state.req_history.getFirstNotProposed();
+		while (request_record != null && this.server_state.getCurrentBallot() == ballot) {
+
+			request_record.setProposed(true);
+
+			if (!this.recovered_values.containsValue(request_record.getId())) {
+				this.processPhaseTwo(request_record.getId(), ballot, this.next_slot_to_dispatch);
+				this.next_slot_to_dispatch++;
+			}
+			request_record = this.server_state.req_history.getFirstNotProposed();
+		}
+
+	}
+
+	private void executeDecided(PaxosInstance entry) {
+		synchronized (this.server_state.execution_lock) {
+			this.server_state.setLastInstance(this.next_log_entry);
+
+			if (entry.decided_value != -1) {
+				this.execute_tx(entry.decided_value);
+			}
+		}
+
+		this.recovered_values.remove(this.next_log_entry);
+	}
+
     public void run() {
 		/*
+			TODO: Refactor this to include FP.
 			Main loop that runs the Multi-Paxos core:
 
 			When this server becomes leader of a ballot, run() first runs Phase 1 (once per ballot) to
@@ -62,59 +129,20 @@ public class MainLoop implements Runnable  {
 
 			this.next_log_entry++;
 			PaxosInstance next_entry = this.server_state.paxos_log.testAndSetEntry(next_log_entry);
-			RequestRecord record = this.server_state.req_history.getFirstPending();
 
 			while(next_entry.decided == false) {
 
-				if (record == null) {
-					record = this.server_state.req_history.getFirstPending();
-				}
-
 				int ballot = this.server_state.getCurrentBallot();
-				if ((this.server_state.scheduler.leader(ballot) == this.server_state.my_id) && this.server_state.getLastPreparedBallot() < ballot) {
-					Map<Integer, Integer> phase_two_values = this.processPhaseOne(this.next_log_entry, ballot);
-					if (phase_two_values != null) {
+				this.recoverAsNewLeader(ballot);
 
-						this.server_state.req_history.resetProposed();
+				if (next_entry.decided == false && this.isLeader(ballot) && this.server_state.getLastPreparedBallot() == ballot) {
 
-						this.recovered_values = phase_two_values;
-						this.next_slot_to_dispatch = this.next_log_entry;
-
-						int recover = phase_two_values.size();
-						for (int slot = this.next_log_entry; recover > 0; slot++) {
-							Integer value = phase_two_values.get(slot);
-							if (value == null) {
-								value = -1;
-							} else {
-								recover--;
-							}
-							this.processPhaseTwo(value, ballot, slot);
-							this.next_slot_to_dispatch = Math.max(this.next_slot_to_dispatch, slot + 1);
-						}
-					}
-				}
-
-				if ((next_entry.decided == false && this.server_state.scheduler.leader(ballot) == this.server_state.my_id) && this.server_state.getLastPreparedBallot() == ballot) {
-
-					if (this.server_state.scheduler.fastpaxos(this.server_state.getCurrentBallot())) {
+					if (this.server_state.scheduler.fastpaxos(ballot)) {
 						// run fast paxos
-						if (this.last_any_ballot < ballot) {
-							this.last_any_ballot = ballot;
-							this.processAny(ballot, this.next_slot_to_dispatch);
-						}
+						this.startFastRound(ballot);
 					} else {
 						// run multi-paxos
-						RequestRecord request = this.server_state.req_history.getFirstNotProposed();
-						while (request != null && this.server_state.getCurrentBallot() == ballot) {
-
-							request.setProposed(true);
-
-							if (!this.recovered_values.containsValue(request.getId())) {
-								this.processPhaseTwo(request.getId(), ballot, this.next_slot_to_dispatch);
-								this.next_slot_to_dispatch++;
-							}
-							request = this.server_state.req_history.getFirstNotProposed();
-						}
+						this.proposePending(ballot);
 					}
 				}
 
@@ -126,15 +154,7 @@ public class MainLoop implements Runnable  {
 			}
 
 			System.out.println("Log entry with number " + this.next_log_entry + " has been decided with command id = "+ next_entry.command_id);
-
-			synchronized (this.server_state.execution_lock) {
-				this.server_state.setLastInstance(this.next_log_entry);
-				if (next_entry.decided_value != -1) {
-					this.execute_tx(next_entry.decided_value);
-				}
-			}
-
-			this.recovered_values.remove(this.next_log_entry);
+			this.executeDecided(next_entry);
 		}
 	}
 
@@ -271,7 +291,6 @@ public class MainLoop implements Runnable  {
 	void processAny(int ballot, int entry_number) {
 		System.out.println("Going to run fast paxos round, sending ANY to every acceptor");
 
-		// TODO - Quorum needs to be a bigger one 
 		List<Integer> acceptors        = this.server_state.scheduler.acceptors(ballot);
 		int           quorum           = this.server_state.scheduler.quorum(ballot);
 		int           n_acceptors      = acceptors.size();
