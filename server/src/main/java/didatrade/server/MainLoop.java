@@ -1,7 +1,6 @@
 package didatrade.server;
 
 import java.util.*;
-import java.util.concurrent.*;
 import didatrade.DidaTradePaxos;
 import didatrade.DidaTradePaxosServiceGrpc;
 import didatrade.util.GenericResponseCollector;
@@ -25,7 +24,7 @@ public class MainLoop implements Runnable  {
 
 	private int next_slot_to_dispatch;
 	private int last_any_ballot;
-    private final Semaphore window = new Semaphore(6); // window size 6
+
 
     public MainLoop(DidaTradeServerState state) {
 		this.server_state   = state;
@@ -298,12 +297,6 @@ public class MainLoop implements Runnable  {
 
 	// Returns true if the value was accepted by a quorum
 	void processPhaseTwo(int value, int ballot, int entry_number) {
-		try {
-            window.acquire();
-        } catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			return;
-		}
 
 		System.out.println("Going to run paxos phase 2");
 		PaxosInstance next_entry = this.server_state.paxos_log.testAndSetEntry(entry_number);
@@ -342,7 +335,6 @@ public class MainLoop implements Runnable  {
 			if (request != null) {
 				request.setProposed(false);
 			}
-			window.release();
 			if (phase_two_processor.getMaxballot() > ballot) {
 				wakeup();
 			}
@@ -354,7 +346,6 @@ public class MainLoop implements Runnable  {
 				entry.decided_value = value;
 				entry.decided = true;	
 			}
-			window.release();
 			wakeup();
 			return;
 		}
