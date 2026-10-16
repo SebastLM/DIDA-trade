@@ -39,6 +39,7 @@ public class GenericResponseCollector<T>  {
 
     public synchronized void addResponse(T resp) {
 
+		// to avoid running onPhaseTwoDone more then once
 		if (this.done) {
 			return;
 		}
