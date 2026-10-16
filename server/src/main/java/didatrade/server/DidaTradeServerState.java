@@ -32,7 +32,8 @@ public class DidaTradeServerState {
 
     private int  current_ballot;
 
-    private ArrayList<Integer>  completed_ballot;
+	// Vertical Paxos: highest ballot c known to be complete
+	private int completed_ballot = -1;
 
     private int                 debug_mode;
     private boolean             fastpaxos_on;
@@ -69,7 +70,7 @@ public class DidaTradeServerState {
 	this.fast_next_instance   = 0;
 
 	this.current_ballot   	  = 0;
-	this.completed_ballot 	  = new ArrayList<>();
+	this.completed_ballot 	  = -1;
 	this.req_history      	  = new RequestHistory();
 	this.paxos_log        	  = new PaxosLog();
 	this.main_loop        	  = new MainLoop(this);
@@ -130,56 +131,26 @@ public class DidaTradeServerState {
 		return (3 * n_acceptors + 3) / 4;
     }
 
-    public synchronized int getCompletedBallot (int instance) {
-		return this.completed_ballot.get(instance);
+    public synchronized int getCompletedBallot() {
+		return this.completed_ballot;
     }
 
-    public int findMaxDecidedBallot () {
-	int ballot = -1;
-	int length = this.paxos_log.length();
-
-	for (int i=0; i< length; i++) {
-	    PaxosInstance entry = this.paxos_log.getEntry(i);
-	    if (entry == null)
-		return ballot;
-	    if (!entry.decided)
-		return ballot;
-	    else if (entry.accept_ballot > ballot)
-		ballot = entry.accept_ballot;
-
-	}
-	return ballot;
-    }
-    
-    public synchronized void updateCompletedBallot (int ballot, int instance) {
-	// WARNING: THIS ONLY WORKS FOR CONFIGURATIONS WHERE THERE IS NO NEED FOR STATE-TRANSFER!!!!!
-	// NEEDS TO BE UPDATE FOR THE PROJECT
-
-		ballot = this.findMaxDecidedBallot ();
-		if (ballot > this.completed_ballot.get(instance)) {
-			this.completed_ballot.add(instance, ballot);
+	public synchronized void setCompletedBallot(int ballot) {
+		if (ballot > this.completed_ballot) {
+			this.completed_ballot = ballot;
 		}
 		this.notifyAll();
     }
 
-	public synchronized void setCompletedBallot (int ballot, int instance) {
-		while (this.completed_ballot.size() <= instance) {
-			this.completed_ballot.add(-1);
-		}
-
-		this.completed_ballot.set(instance, ballot);
-		this.notifyAll();
-    }
-
-    public synchronized int waitForCompletedBallot(int ballot, int instance) {
-        while (this.completed_ballot.get(instance) < ballot) {
+    public synchronized int waitForCompletedBallot(int ballot) {
+        while (this.completed_ballot < ballot) {
             try {
 		wait ();
 	    }
 	    catch (InterruptedException e) {
 	    }
 	}
-		return this.completed_ballot.get(instance);
+		return this.completed_ballot;
     }
 
 

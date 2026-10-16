@@ -15,7 +15,9 @@ public class MainLoop implements Runnable  {
 
     private boolean has_work;
     private int next_log_entry;
+
 	private Map<Integer, Integer> recovered_values = new HashMap<>();
+
     private List<Integer> all_participants;
     private int n_participants;
     private String[] targets;
@@ -25,6 +27,9 @@ public class MainLoop implements Runnable  {
 	private int next_slot_to_dispatch;
 	private int last_any_ballot;
 
+	private final Object recovery_lock     = new Object();
+	private Set<Integer> slots_we_recover  = new HashSet<>();
+	private int          recovering_ballot = -1;
 
     public MainLoop(DidaTradeServerState state) {
 		this.server_state   = state;
@@ -34,28 +39,74 @@ public class MainLoop implements Runnable  {
 		this.last_any_ballot = -1;
     }
 
+	private boolean acceptorsChanged(int cb, int ballot) {
+		Set<Integer> current = new HashSet<>(this.server_state.scheduler.acceptors(ballot));
+		for (int b = Math.max(cb, 0); b < ballot; b++) {
+			if (!current.equals(new HashSet<>(this.server_state.scheduler.acceptors(b)))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private void recoverAsNewLeader(int ballot) {
 		if (this.isLeader(ballot) && this.server_state.getLastPreparedBallot() < ballot) {
 
-			Map<Integer, Integer> phase_two_values = this.processPhaseOne(this.next_log_entry, ballot);
+			int cb = this.server_state.getCompletedBallot();
+
+			// Verify, did any ballot in [cb, ballot-1] (low, high) used a set of diff acceptors then this ballot?
+			// if so we must re-send the history (state-transfer)
+			boolean acceptors_changed = this.acceptorsChanged(cb, ballot);
+
+			Map<Integer, Integer> phase_two_values = this.processPhaseOne(this.next_log_entry, ballot, cb);
 				if (phase_two_values != null) {
 
+         			// The checklist: every slot to send in phase 2 for this ballot
+					Map<Integer, Integer> recovery = new HashMap<>();
+					//  State-transfer!
+					if (acceptors_changed) {
+						for (int slot = 0; slot < this.next_log_entry; slot++) {
+							recovery.put(slot, this.server_state.paxos_log.getEntry(slot).decided_value);
+						}
+					}
+					// Pending requests may have been lost (probabily impossible but for safety)
 					this.server_state.req_history.resetProposed();
 
+                    // store the phase 1 values so on proposePending we avoid proposing them twice
+					// would not affect correctness but its dumb to send them twice.
 					this.recovered_values = phase_two_values;
+
 					this.next_slot_to_dispatch = this.next_log_entry;
 
 					int number_of_recovered_values = phase_two_values.size();
 					for (int slot = this.next_log_entry; number_of_recovered_values  > 0; slot++) {
 						Integer value = phase_two_values.get(slot);
 						if (value == null) {
+							// NO-OP!
 							value = -1;
 						} else {
 							number_of_recovered_values --;
 						}
-
-						this.processPhaseTwo(value, ballot, slot);
+						recovery.put(slot, value);
 						this.next_slot_to_dispatch = Math.max(this.next_slot_to_dispatch, slot + 1);
+					}
+
+					synchronized (this.recovery_lock) {
+						// for this ballot
+						this.recovering_ballot = ballot;
+						// these are the slots that need to be accepted by a majority of acceptors
+						this.slots_we_recover  = new HashSet<>(recovery.keySet());
+					}
+
+					// Nothing to state-transfer, this ballot is completed
+					if (recovery.isEmpty()) {
+						this.server_state.setCompletedBallot(ballot);
+					}
+
+					// Schedule A or B: never a state transfer, so this sends only the phase 1 values.
+					// Schedule C: if the acceptor-set changed since cb, it also re-sends every decided slot in [0, next_log_entry) so the new acceptors store the history.
+					for (Map.Entry<Integer, Integer> r : recovery.entrySet()) {
+						this.processPhaseTwo(r.getValue(), ballot, r.getKey());
 					}
 				}
 			}
@@ -230,11 +281,23 @@ public class MainLoop implements Runnable  {
 		this.has_work = false;
 	}
 
-	Map<Integer, Integer> processPhaseOne(int entry_number, int ballot) {
+	Map<Integer, Integer> processPhaseOne(int entry_number, int ballot, int completed_ballot) {
 
-		List<Integer> acceptors        = this.server_state.scheduler.acceptors(ballot);
-		int           quorum           = this.server_state.scheduler.quorum(ballot);
-		int           n_acceptors      = acceptors.size();
+		// Vertical Paxos I: read every configuration in [completed_ballot, ballot - 1]
+		int           low_ballot  = Math.max(completed_ballot, 0);
+		int           high_ballot = ballot - 1;
+		List<Integer> acceptors;
+		if (ballot == 0 || low_ballot > high_ballot) {
+			// no previous ballot to read: use this ballot's configuration (processor range must match)
+			low_ballot  = ballot;
+			high_ballot = ballot;
+			acceptors = this.server_state.scheduler.acceptors(ballot);
+		} else {
+			acceptors = this.server_state.scheduler.acceptorsinrange(low_ballot, high_ballot);
+		}
+
+		int           quorum      = this.server_state.scheduler.quorum(ballot);
+		int           n_acceptors = acceptors.size();
 
 		// Paxos Phase One
 		System.out.println("Going to run paxos phase 1");
@@ -247,7 +310,7 @@ public class MainLoop implements Runnable  {
 		DidaTradePaxos.PhaseOneRequest phase_one_request = phase_one_request_builder.build();
 		System.out.println("Going to send phase 1" + phase_one_request);
 
-		PhaseOneProcessor phase_one_processor = new PhaseOneProcessor(this.server_state.scheduler, quorum);
+		PhaseOneProcessor phase_one_processor = new PhaseOneProcessor(this.server_state.scheduler, quorum, low_ballot, high_ballot);
 
 		ArrayList<DidaTradePaxos.PhaseOneReply> phase_one_responses = new ArrayList<DidaTradePaxos.PhaseOneReply>();
 		GenericResponseCollector<DidaTradePaxos.PhaseOneReply> phase_one_collector = new GenericResponseCollector<DidaTradePaxos.PhaseOneReply>(phase_one_responses, n_acceptors, phase_one_processor);
@@ -363,8 +426,21 @@ public class MainLoop implements Runnable  {
 			synchronized (entry) {
 				entry.command_id = value;
 				entry.decided_value = value;
-				entry.decided = true;	
+				entry.decided = true;
 			}
+
+			boolean completed = false;
+			synchronized (this.recovery_lock) {
+				if (ballot == this.recovering_ballot
+						&& this.slots_we_recover.remove(entry_number)
+						&& this.slots_we_recover.isEmpty()) {
+					completed = true;
+				}
+			}
+			if (completed) {
+				this.server_state.setCompletedBallot(ballot);
+			}
+
 			wakeup();
 			return;
 		}
@@ -455,8 +531,8 @@ public class MainLoop implements Runnable  {
 				.build();
 
 		List<Integer> learners = this.server_state.scheduler.learners(this.server_state.getCurrentBallot());
-		int n_targets = learners.size() - 1; // removing this node from counting (all nodes are learners)
-		
+		int n_targets = 	learners.size() - 1; // removing this node from counting (all nodes are learners)
+
 		ArrayList<DidaTradePaxos.StateTransferReply> stateTransferResponses = new ArrayList<DidaTradePaxos.StateTransferReply>();
 		GenericResponseCollector<DidaTradePaxos.StateTransferReply> stateTransferResp_collector = new GenericResponseCollector<DidaTradePaxos.StateTransferReply>(stateTransferResponses, n_targets);
 
@@ -475,7 +551,7 @@ public class MainLoop implements Runnable  {
 		if (best == null || best.getRecoverCount() == 0) {
 			return;
 		}
-		
+
 		for (int i = 0; i < best.getRecoverCount(); i++) {
 			DidaTradePaxos.PerInstance instance_x = best.getRecover(i);
 			int entry_number = instance + i;
@@ -486,7 +562,7 @@ public class MainLoop implements Runnable  {
 				DidaTradeCommand command = new DidaTradeCommand(action, instance_x.getUserid(), instance_x.getQuantity(), instance_x.getStock());
 				RequestRecord record = new RequestRecord(instance_x.getReqid(), command);
 				record.setProposed(true);
-				
+
 				this.server_state.req_history.addToPending(instance_x.getReqid(), record);
 			}
 

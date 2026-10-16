@@ -23,15 +23,31 @@ public class DidaTradeMasterServiceImpl extends DidaTradeMasterServiceGrpc.DidaT
 	// for debug purposes
 	System.out.println("Current ballot = " + this.server_state.getCurrentBallot() + " new ballot = " + new_ballot + " completed ballot = " + completed_ballot);
 
+	/*
+	The console is telling the server that: a majority of acceptors already sotred every value
+	that may have been chosen in ballots <= completed_ballot.
+
+	So this server in phase1 will only need to read the confs of ballots [completed_ballot, new_ballot - 1]
+	*/
+	this.server_state.setCompletedBallot(completed_ballot);
+
 	if (new_ballot > this.server_state.getCurrentBallot()) {
 	    this.server_state.setCurrentBallot (new_ballot);
 
 	    this.server_state.main_loop.wakeup();
 	}
 
+	int completed;
+	if (this.server_state.scheduler.leader(new_ballot) == this.server_state.my_id) {
+		// if the leader never completes (acceptors are down, is frozen..) this will wait forever.
+	    completed = this.server_state.waitForCompletedBallot(new_ballot);
+	} else {
+	    completed = this.server_state.getCompletedBallot();
+	}
+
 	DidaTradeMaster.NewBallotReply.Builder response_builder = DidaTradeMaster.NewBallotReply.newBuilder();
 	response_builder.setReqid(request_id);
-	response_builder.setCompletedballot(completed_ballot);
+	response_builder.setCompletedballot(completed);
 
 	DidaTradeMaster.NewBallotReply response = response_builder.build();
 	responseObserver.onNext(response);
