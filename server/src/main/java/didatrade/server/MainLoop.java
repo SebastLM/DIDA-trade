@@ -91,11 +91,13 @@ public class MainLoop implements Runnable  {
 						this.next_slot_to_dispatch = Math.max(this.next_slot_to_dispatch, slot + 1);
 					}
 
+					// we have to store the ballot that we are trying to recovery until...
+					this.recovering_ballot = ballot;
+					
 					synchronized (this.recovery_lock) {
 						// for this ballot
-						this.recovering_ballot = ballot;
 						// these are the slots that need to be accepted by a majority of acceptors
-						this.slots_we_recover  = new HashSet<>(recovery.keySet());
+						this.slots_we_recover = new HashSet<>(recovery.keySet());
 					}
 
 					// Nothing to state-transfer, this ballot is completed
